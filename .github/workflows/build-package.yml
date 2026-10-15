@@ -14,12 +14,21 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-      - name: Validate offline HTML exists
-        run: test -s index.html
+      - name: Locate offline app source
+        shell: bash
+        run: |
+          if [[ -s index.html ]]; then
+            cp index.html /tmp/kanako-app.html
+          elif [[ -s Kanako_Offline_Workbench.html ]]; then
+            cp Kanako_Offline_Workbench.html /tmp/kanako-app.html
+          else
+            echo "Upload index.html or Kanako_Offline_Workbench.html to the repository root." >&2
+            exit 1
+          fi
       - name: Package offline app
         run: |
           mkdir -p dist
-          cp index.html dist/Kanako_Offline_Workbench.html
+          cp /tmp/kanako-app.html dist/Kanako_Offline_Workbench.html
           cp README.md dist/README.md
           cd dist
           zip -9 Kanako_Offline_Workbench_Package.zip Kanako_Offline_Workbench.html README.md
