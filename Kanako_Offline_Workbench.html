@@ -160,12 +160,18 @@ function getPdfField(rows,labelPattern){
     const match=rows[i].text.match(rx);
     if(match){const value=String(match[1]||'').trim().replace(/^[|:–—-]+|[|:–—-]+$/g,'').trim();if(value)return value}
     if(new RegExp('(?:'+labelPattern+')\\s*:?\\s*$','i').test(rows[i].text)){
-      for(let j=i+1;j<Math.min(rows.length,i+4);j++){
+      const values=[];
+      for(let j=i+1;j<Math.min(rows.length,i+5);j++){
         const next=rows[j].text.trim();
         if(!next||new RegExp('^(?:'+nextField+')\\b','i').test(next))continue;
         const clean=next.replace(/\\s+(?:FINAL SCORE|GOAL|SCORE)\\b.*$/i,'').trim();
-        if(clean)return clean;
+        if(clean)values.push(clean);
       }
+      const isClientField=/Client|Account/i.test(labelPattern);
+      const previousIsBlankWeekLabel=i>0&&/^(?:Call Week|Audit Week|Week of Audit)\\s*:?\\s*$/i.test(rows[i-1].text.trim());
+      const preferred=values[isClientField&&previousIsBlankWeekLabel?1:0];
+      if(preferred)return preferred;
+      if(values.length)return values[0];
     }
   }
   return '';
