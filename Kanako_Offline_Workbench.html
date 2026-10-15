@@ -385,6 +385,8 @@ async function uploadPendingCloudFiles(){
  }
  for(const a of (data.audits||[])){
   if(!a.pdf_file_id||a.pdf_storage_path)continue;
+  const linked=data.files.find(f=>String(f.id)===String(a.source_file_id)||String(f.pdf_file_id||'')===String(a.pdf_file_id));
+  if(linked?.pdf_storage_path){a.pdf_storage_path=linked.pdf_storage_path;changed=true;continue}
   try{const media=await getMedia(a.pdf_file_id);if(!media?.blob)continue;const file=new File([media.blob],a.pdf_file_name||media.name||'qa-audit.pdf',{type:a.pdf_content_type||media.type||'application/pdf'});const uploaded=await uploadCloudFile('audit-'+a.id,'auditpdf',file);a.pdf_storage_path=uploaded.path;changed=true}
   catch(err){failed++;console.warn('Kanako audit attachment upload pending:',err?.message||err)}
  }
