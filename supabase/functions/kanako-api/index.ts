@@ -250,7 +250,13 @@ async function handler(req: Request) {
       if (!uploadFile) return response(origin, { error: "No file was attached." }, 400);
       const recordKey = String(body.recordKey || ""), kind = String(body.kind || "");
       if (!/^[a-zA-Z0-9_-]{3,100}$/.test(recordKey) || !["pdf","mp4","auditpdf"].includes(kind)) return response(origin, { error: "Invalid file reference." }, 400);
-      if (uploadFile.size <= 0 || uploadFile.size > 49 * 1024 * 1024) return response(origin, { error: "Files must be smaller than 49 MB." }, 413);
+      
+const maxBytes = kind === "mp4" ? 100 * 1024 * 1024 : 45 * 1024 * 1024;
+const maxLabel = kind === "mp4" ? "100 MB" : "45 MB";
+if (uploadFile.size <= 0 || uploadFile.size > maxBytes) {
+  return response(origin, { error: `Files must be ${maxLabel} or smaller.` }, 413);
+}
+
       const contentType = uploadFile.type || (kind === "mp4" ? "video/mp4" : "application/pdf");
       if (kind === "mp4" && contentType !== "video/mp4" && contentType !== "application/octet-stream") return response(origin, { error: "Only MP4 recordings are supported." }, 415);
       if (kind !== "mp4" && contentType !== "application/pdf" && !uploadFile.name.toLowerCase().endsWith(".pdf")) return response(origin, { error: "Only PDF audit files are supported." }, 415);
