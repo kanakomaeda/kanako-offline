@@ -17,6 +17,14 @@ Upload the downloaded `Kanako_Offline_Workbench.html` file to the repository roo
 3. Use the same browser profile for continued local work. Records and PDF/MP4 evidence files are stored locally in that browser/device.
 4. Keep backups and download important evidence files separately.
 
+## Login and access levels
+
+- On first use, create your **Superuser** account with your own username and password. No default password is built into the app.
+- The Superuser has full app access and can create, deactivate/reactivate, or reset passwords for Admin accounts; delete records; and import/export backups.
+- Admin accounts can view, create, and edit operational records but cannot delete records, import/export backups, or manage accounts.
+- Passwords are stored as salted PBKDF2-SHA-256 hashes rather than plain text. Each sign-in session ends when the page is refreshed or the user logs out.
+- **Important:** account records and role settings are stored in the local browser, separate from the workspace data. Admin accounts do not automatically appear on another computer or browser. This offline, client-side login is an access gate, not server-enforced security; users with direct access to the browser profile or HTML source may bypass it. Use a server-backed authentication system for secure multi-device or remote access.
+
 ## Local data and privacy
 
 - Local records are not uploaded to a server.
