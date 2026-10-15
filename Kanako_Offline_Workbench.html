@@ -361,8 +361,72 @@ function openMediaDB(){return new Promise((resolve,reject)=>{const req=indexedDB
 async function putMedia(id,file){const db=await openMediaDB();return new Promise((resolve,reject)=>{const tx=db.transaction(MEDIA_STORE,'readwrite');tx.objectStore(MEDIA_STORE).put({id,name:file.name,type:file.type|| (file.name.toLowerCase().endsWith('.pdf')?'application/pdf':'video/mp4'),size:file.size,blob:file,stored_at:new Date().toISOString()});tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{const e=tx.error||new Error('Could not save file locally.');db.close();reject(e)};tx.onabort=()=>{const e=tx.error||new Error('Local file save was aborted.');db.close();reject(e)}})}
 async function getMedia(id){if(!id)return null;const db=await openMediaDB();return new Promise((resolve,reject)=>{const tx=db.transaction(MEDIA_STORE,'readonly'),req=tx.objectStore(MEDIA_STORE).get(id);req.onsuccess=()=>{db.close();resolve(req.result||null)};req.onerror=()=>{const e=req.error;db.close();reject(e)}})}
 async function deleteMedia(id){if(!id)return;const db=await openMediaDB();return new Promise((resolve,reject)=>{const tx=db.transaction(MEDIA_STORE,'readwrite');tx.objectStore(MEDIA_STORE).delete(id);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{const e=tx.error;db.close();reject(e)}})}
-async function openLocalMedia(id){try{const item=await getMedia(id);if(!item||!item.blob){toast('File unavailable','This file is not present in this browser storage. Re-upload it from your computer.',true);return}const url=URL.createObjectURL(item.blob);const a=document.createElement('a');a.href=url;a.download=item.name||'kanako-evidence-file';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('File ready to save',item.name+' is being downloaded from local browser storage.')}catch(e){toast('Could not download file',e.message||'Local file storage could not be read.',true)}}
-function downloadLocalMedia(id){openLocalMedia(id)}
+
+async function cloudRequest(action,payload={},opts={}){
+ const headers={'apikey':CLOUD_KEY};if(cloudToken&&opts.auth!==false)headers.Authorization='Bearer '+cloudToken;
+ let body;if(opts.formData){body=opts.formData;body.set('action',action)}else{headers['Content-Type']='application/json';body=JSON.stringify({action,...payload})}
+ const res=await fetch(CLOUD_API,{method:'POST',headers,body});let result={};try{result=await res.json()}catch(_){}
+ if(!res.ok)throw new Error(result.error||('Cloud request failed ('+res.status+').'));return result;
+}
+const CLOUD_COLLECTIONS=['trainees','audits','coachings','weekly_reports','files','feature_ideas'];
+function asCloudRows(source){const rows=[];for(const type of CLOUD_COLLECTIONS)for(const rec of (source[type]||[]))if(rec&&rec.id)rows.push({record_type:type,record_key:String(rec.id),payload:rec});return rows}
+function cloudRowsToData(rows){const result=clone(defaults);for(const row of rows||[]){if(!CLOUD_COLLECTIONS.includes(row.record_type)||!row.payload||typeof row.payload!=='object')continue;const item={...row.payload,id:row.payload.id||String(row.record_key)},arr=result[row.record_type],i=arr.findIndex(x=>String(x.id)===String(item.id));if(i>=0)arr[i]=item;else arr.push(item)}return result}
+function cloudMaps(source){const out={};for(const type of CLOUD_COLLECTIONS){out[type]=Object.create(null);for(const item of source[type]||[])if(item&&item.id)out[type][String(item.id)]=item}return out}
+function sameRecord(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function scheduleCloudSync(){if(!cloudReady||!currentUser)return;if(cloudSyncTimer)clearTimeout(cloudSyncTimer);cloudSyncStatus='pending';renderSync();cloudSyncTimer=setTimeout(()=>syncCloudNow().catch(()=>{}),1200)}
+async function uploadCloudFile(recordKey,kind,file){const form=new FormData();form.append('recordKey',String(recordKey));form.append('kind',kind);form.append('file',file,file.name||('evidence.'+(kind==='mp4'?'mp4':'pdf')));return await cloudRequest('file-upload',{}, {formData:form})}
+async function uploadPendingCloudFiles(){
+ let changed=false,failed=0;
+ for(const f of (data.files||[]))for(const part of [{key:'pdf_file_id',path:'pdf_storage_path',kind:'pdf',name:'pdf_original_name',type:'pdf_content_type'},{key:'mp4_file_id',path:'mp4_storage_path',kind:'mp4',name:'mp4_original_name',type:'mp4_content_type'}]){
+  if(!f[part.key]||f[part.path])continue;
+  try{const media=await getMedia(f[part.key]);if(!media?.blob)continue;const file=new File([media.blob],f[part.name]||media.name||('evidence.'+part.kind),{type:f[part.type]||media.type||(part.kind==='mp4'?'video/mp4':'application/pdf')});const uploaded=await uploadCloudFile(f.id,part.kind,file);f[part.path]=uploaded.path;f.sync_status='Cloud synced';changed=true}
+  catch(err){failed++;console.warn('Kanako file upload pending:',err?.message||err)}
+ }
+ for(const a of (data.audits||[])){
+  if(!a.pdf_file_id||a.pdf_storage_path)continue;
+  try{const media=await getMedia(a.pdf_file_id);if(!media?.blob)continue;const file=new File([media.blob],a.pdf_file_name||media.name||'qa-audit.pdf',{type:a.pdf_content_type||media.type||'application/pdf'});const uploaded=await uploadCloudFile('audit-'+a.id,'auditpdf',file);a.pdf_storage_path=uploaded.path;changed=true}
+  catch(err){failed++;console.warn('Kanako audit attachment upload pending:',err?.message||err)}
+ }
+ if(changed)save(true);if(failed)cloudSyncStatus='error';
+}
+async function initializeCloudWorkspace(){
+ cloudReady=false;cloudSyncStatus='syncing';renderSync();const localCopy=clone(data);
+ let response=await cloudRequest('data-pull'),remoteRows=response.records||[],remoteData=cloudRowsToData(remoteRows);
+ if(!remoteRows.length){
+  if(currentUser.role!=='superuser')throw new Error('The shared workspace is empty. Ask the Superuser to complete first-time setup on the original device.');
+  data=localCopy;await uploadPendingCloudFiles();await pushAllLocalData();response=await cloudRequest('data-pull');remoteRows=response.records||[];remoteData=cloudRowsToData(remoteRows);
+ }else{
+  data=remoteData;
+  if(currentUser.role==='superuser'){
+   const addedByType={};let additions=0;
+   for(const type of CLOUD_COLLECTIONS){const known=new Set((remoteData[type]||[]).map(x=>String(x.id))),extras=(localCopy[type]||[]).filter(x=>x&&x.id&&!known.has(String(x.id)));if(extras.length){data[type].push(...extras);addedByType[type]=new Set(extras.map(x=>String(x.id)));additions+=extras.length}}
+   if(additions){await uploadPendingCloudFiles();const rows=asCloudRows(data).filter(r=>addedByType[r.record_type]?.has(r.record_key));for(let i=0;i<rows.length;i+=250)await cloudRequest('data-sync',{upsert:rows.slice(i,i+250),deletes:[]});response=await cloudRequest('data-pull');remoteRows=response.records||[];remoteData=cloudRowsToData(remoteRows)}
+  }
+ }
+ data=remoteData;cloudBaseline=cloudMaps(remoteData);save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();renderSync();
+}
+async function pushAllLocalData(){const rows=asCloudRows(data);for(let i=0;i<rows.length;i+=250)await cloudRequest('data-sync',{upsert:rows.slice(i,i+250),deletes:[]})}
+async function syncCloudNow(force=false){
+ if(!cloudToken||!currentUser||(!cloudReady&&!force))return;if(cloudSyncRunning){cloudSyncAgain=true;return}
+ cloudSyncRunning=true;cloudSyncStatus='syncing';renderSync();
+ try{
+  await uploadPendingCloudFiles();const local=clone(data),localMaps=cloudMaps(local),upsert=[],deletes=[];
+  for(const type of CLOUD_COLLECTIONS){const base=cloudBaseline[type]||Object.create(null),items=localMaps[type]||Object.create(null);for(const [id,rec] of Object.entries(items))if(!base[id]||!sameRecord(rec,base[id]))upsert.push({record_type:type,record_key:id,payload:rec});for(const id of Object.keys(base))if(!items[id])deletes.push({record_type:type,record_key:id})}
+  const batches=Math.max(Math.ceil(upsert.length/250),Math.ceil(deletes.length/250));for(let i=0;i<batches;i++)await cloudRequest('data-sync',{upsert:upsert.slice(i*250,(i+1)*250),deletes:deletes.slice(i*250,(i+1)*250)});
+  const result=await cloudRequest('data-pull'),remoteData=cloudRowsToData(result.records||[]),remoteMaps=cloudMaps(remoteData),latest=clone(data),latestMaps=cloudMaps(latest),localMapsNow=cloudMaps(local);
+  for(const type of CLOUD_COLLECTIONS){const merged=remoteData[type]||[],byId=new Map(merged.map(x=>[String(x.id),x])),localType=localMapsNow[type]||{},latestType=latestMaps[type]||{};for(const [id,item] of Object.entries(latestType))if(!sameRecord(item,localType[id]))byId.set(id,item);for(const id of Object.keys(localType))if(!latestType[id])byId.delete(id);remoteData[type]=[...byId.values()]}
+  data=remoteData;cloudBaseline=remoteMaps;save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();renderSync();
+  const mergedMaps=cloudMaps(data);let pending=false;for(const type of CLOUD_COLLECTIONS){const base=cloudBaseline[type]||{};for(const [id,item] of Object.entries(mergedMaps[type]||{}))if(!base[id]||!sameRecord(item,base[id]))pending=true;for(const id of Object.keys(base))if(!mergedMaps[type][id])pending=true}if(pending)scheduleCloudSync();
+ }catch(err){cloudSyncStatus='error';renderSync();console.warn('Kanako cloud sync failed:',err?.message||err);throw err}
+ finally{cloudSyncRunning=false;if(cloudSyncAgain){cloudSyncAgain=false;scheduleCloudSync()}}
+}
+async function openLocalMedia(id,storagePath=null){
+ let blank=null;try{const item=await getMedia(id);if(item?.blob){const url=URL.createObjectURL(item.blob),a=document.createElement('a');a.href=url;a.download=item.name||'kanako-evidence-file';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('File ready to save',item.name+' is being downloaded.');return}
+  if(storagePath&&cloudToken){blank=window.open('about:blank','_blank');const result=await cloudRequest('file-url',{path:storagePath});if(blank)blank.location.href=result.url;else window.location.href=result.url;return}
+  toast('File unavailable','This attachment has not been uploaded to shared storage yet. Ask the uploader to open Kanako online so it can sync.',true);
+ }catch(e){if(blank)blank.close();toast('Could not download file',e.message||'The file could not be retrieved from shared storage.',true)}
+}
+function downloadLocalMedia(id,storagePath=null){openLocalMedia(id,storagePath)}
 
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(t,m='',err=false){const n=document.createElement('div');n.className='toast'+(err?' error':'');n.style.cssText='position:fixed;z-index:90;right:20px;bottom:20px;max-width:360px;background:#1b2a40;color:#fff;border-radius:10px;padding:13px 16px;box-shadow:0 12px 35px #101b2c33;font-size:11px;line-height:1.6';n.innerHTML='<strong style="display:block;margin-bottom:2px">'+esc(t)+'</strong>'+esc(m);document.body.appendChild(n);setTimeout(()=>n.remove(),4500)}
