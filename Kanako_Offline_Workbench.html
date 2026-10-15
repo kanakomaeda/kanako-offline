@@ -154,8 +154,20 @@ function buildPdfRows(items){
   return rows.sort((a,b)=>b.y-a.y).map(row=>{row.cells.sort((a,b)=>a.x-b.x);row.text=row.cells.map(c=>c.text).join(' ').replace(/\s+/g,' ').trim();return row}).filter(r=>r.text);
 }
 function getPdfField(rows,labelPattern){
-  const rx=new RegExp('(?:'+labelPattern+')\\s*:?\\s*(.*)$','i');
-  for(let i=0;i<rows.length;i++){const match=rows[i].text.match(rx);if(!match)continue;const value=String(match[1]||'').trim();if(value)return value;for(let j=i+1;j<Math.min(rows.length,i+3);j++){const next=rows[j].text.trim();if(next&&!/^(?:Date of Audit|Call Week|Client|VA Name|Trainee Name)\b/i.test(next))return next}}
+  const nextField='Date of Audit|Audit Date|Date Evaluated|Call Week|Audit Week|Week of Audit|Client|Account|VA Name|Trainee Name|Employee Name|Auditor|Evaluator|QA by|FINAL SCORE|Did the VA follow|QA Guidelines|GOAL|SCORE';
+  const rx=new RegExp('(?:'+labelPattern+')\\s*:?\\s*(.*?)(?=\\s+(?:'+nextField+')\\b|\\s+\\d{1,3}(?:\\.\\d+)?\\s*$|$)','i');
+  for(let i=0;i<rows.length;i++){
+    const match=rows[i].text.match(rx);
+    if(match){const value=String(match[1]||'').trim().replace(/^[|:–—-]+|[|:–—-]+$/g,'').trim();if(value)return value}
+    if(new RegExp('(?:'+labelPattern+')\\s*:?\\s*$','i').test(rows[i].text)){
+      for(let j=i+1;j<Math.min(rows.length,i+4);j++){
+        const next=rows[j].text.trim();
+        if(!next||new RegExp('^(?:'+nextField+')\\b','i').test(next))continue;
+        const clean=next.replace(/\\s+(?:FINAL SCORE|GOAL|SCORE)\\b.*$/i,'').trim();
+        if(clean)return clean;
+      }
+    }
+  }
   return '';
 }
 function pdfDateToISO(raw){
@@ -211,14 +223,51 @@ async function handleAuditPdfSelection(file,type){
   finally{if(modal===context)modal.pdfParsing=false}
 }
 function upsertAuditFromEvidence(fileRecord,parsed){
-  if(!parsed||parsed.score===null||!Number.isFinite(Number(parsed.score))||!fileRecord?.trainee_id)return false;
+  if(!parsed||parsed.score===null||!Number.isFinite(Number(parsed.score))||Number(parsed.score)<0||Number(parsed.score)>100)return false;
+  const resolvedTraineeId=parsed.trainee_id||fileRecord?.trainee_id;
+  if(!resolvedTraineeId)return false;
   const auditDate=parsed.audit_date||fileRecord.reference_date||'',weekLabel=parsed.week_label||fileRecord.week_label||parseAuditWeek('',fileRecord.pdf_original_name,auditDate);
-  const existing=data.audits.find(a=>String(a.source_file_id||'')===String(fileRecord.id)||(String(a.trainee_id)===String(fileRecord.trainee_id)&&String(a.audit_date||'')===String(auditDate)&&String(a.pdf_file_name||'')===String(fileRecord.pdf_original_name||'')));
+  const existing=data.audits.find(a=>String(a.source_file_id||'')===String(fileRecord.id)||(String(a.trainee_id)===String(resolvedTraineeId)&&String(a.audit_date||'')===String(auditDate)&&String(a.pdf_file_name||'')===String(fileRecord.pdf_original_name||'')));
   const auditId=existing?.id||uuid(),now=new Date().toISOString();
-  const audit={id:auditId,trainee_id:fileRecord.trainee_id,audit_date:auditDate,week_label:weekLabel,score:Number(parsed.score),max_score:Number(parsed.max_score||100),client_name:parsed.client_name||'',auditor:parsed.auditor||'QA audit PDF',strengths:parsed.strengths||'',gaps:parsed.gaps||'',notes:parsed.notes||'',pdf_file_name:fileRecord.pdf_original_name||parsed.pdf_file_name||'',pdf_file_id:fileRecord.pdf_file_id||null,source_file_id:fileRecord.id,coaching_required:true,created_at:existing?.created_at||now,updated_at:now};
+  const audit={id:auditId,trainee_id:resolvedTraineeId,audit_date:auditDate,week_label:weekLabel,score:Number(parsed.score),max_score:Number(parsed.max_score||100),client_name:parsed.client_name||'',auditor:parsed.auditor||'QA audit PDF',strengths:parsed.strengths||'',gaps:parsed.gaps||'',notes:parsed.notes||'',pdf_file_name:fileRecord.pdf_original_name||parsed.pdf_file_name||'',pdf_file_id:fileRecord.pdf_file_id||null,source_file_id:fileRecord.id,coaching_required:true,created_at:existing?.created_at||now,updated_at:now};
   if(existing)Object.assign(existing,audit);else data.audits.unshift(audit);
   if(!data.coachings.some(c=>String(c.qa_audit_id||'')===String(auditId)))data.coachings.unshift({id:uuid(),trainee_id:audit.trainee_id,qa_audit_id:auditId,session_date:audit.audit_date||fileRecord.reference_date||'',status:'Pending',focus_areas:audit.gaps||audit.notes||'Review the QA findings and agree on improvement actions.',strengths:audit.strengths||'',created_at:now,updated_at:now});
   return true;
+}
+let priorQaPdfScanRunning=false;
+async function processExistingQaPdfs(){
+  if(!currentUser||priorQaPdfScanRunning)return;
+  const pending=(data.files||[]).filter(f=>f.pdf_file_id&&!data.audits.some(a=>String(a.source_file_id||'')===String(f.id)||(!!f.source_audit_id&&String(a.id||'')===String(f.source_audit_id))));
+  if(!pending.length)return;
+  priorQaPdfScanRunning=true;
+  let processed=0,skipped=0,unavailable=0;
+  try{
+    for(const record of pending){
+      try{
+        const media=await getMedia(record.pdf_file_id);
+        if(!media?.blob){unavailable++;continue}
+        const filename=record.pdf_original_name||media.name||'QA-audit.pdf';
+        const file=new File([media.blob],filename,{type:'application/pdf'});
+        const parsed=await extractAuditPdf(file);
+        const matched=findTraineeForPdf(parsed.trainee_name,filename);
+        const resolvedId=matched?.id||parsed.trainee_id||record.trainee_id||'';
+        const auditDate=parsed.audit_date||record.reference_date||'';
+        const weekLabel=parsed.week_label||record.week_label||parseAuditWeek('',filename,auditDate);
+        const hydrated={...record,trainee_id:resolvedId,reference_date:auditDate,week_label:weekLabel};
+        if(!upsertAuditFromEvidence(hydrated,{...parsed,trainee_id:resolvedId,audit_date:auditDate,week_label:weekLabel})){skipped++;continue}
+        const stored=data.files.find(f=>String(f.id)===String(record.id));
+        const created=data.audits.find(a=>String(a.source_file_id||'')===String(record.id));
+        if(stored){stored.trainee_id=resolvedId;stored.reference_date=auditDate;stored.week_label=weekLabel;if(created)stored.source_audit_id=created.id}
+        processed++;
+      }catch(err){skipped++}
+    }
+    if(processed){
+      if(save()){render();toast('Existing QA PDFs processed',processed+' previously uploaded PDF(s) added to QA Audits.'+(skipped?' '+skipped+' file(s) could not be fully read.':''));}
+      else toast('QA PDF scan could not save','The PDFs were read, but the audit records could not be saved locally. Export a backup and check browser storage.',true);
+    }else if(skipped||unavailable){
+      toast('Some previous QA PDFs need review',(skipped+unavailable)+' uploaded PDF(s) were not auto-populated. Confirm that the PDF has selectable text and is still stored in this browser.',true);
+    }
+  }finally{priorQaPdfScanRunning=false}
 }
 
 function loadAuthUsers(){try{const u=JSON.parse(localStorage.getItem(AUTH_KEY)||'[]');return Array.isArray(u)?u:[]}catch(e){return []}}
@@ -231,7 +280,7 @@ function showAuthMessage(message){$('#authMessage').textContent=message;$('#auth
 function clearUserMessage(){const el=$('#userMessage');el.textContent='';el.classList.add('hidden')}
 function renderAuthScreen(){const setup=!authUsers.some(u=>u.role==='superuser');$('#authEyebrow').textContent=setup?'FIRST-TIME SETUP':'SECURE LOCAL ACCESS';$('#authTitle').textContent=setup?'Create your Superuser account':'Welcome back';$('#authDescription').textContent=setup?'Set up the owner account first. This account has full access and can create Admin accounts.':'Sign in using your assigned account to access Kanako Progress Hub.';$('#authMessage').textContent='';$('#authMessage').classList.add('hidden');$('#authFields').innerHTML=setup?'<div class="auth-field"><label for="setupDisplayName">Your name *</label><input id="setupDisplayName" required maxlength="80" autocomplete="name"></div><div class="auth-field"><label for="setupUsername">Superuser username *</label><input id="setupUsername" required minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" autocomplete="username"><small>Use 3–32 letters, numbers, dots, underscores, or hyphens.</small></div><div class="auth-field"><label for="setupPassword">Create password *</label><input id="setupPassword" type="password" required minlength="10" autocomplete="new-password"><small>Use at least 10 characters. Keep it private.</small></div><div class="auth-field"><label for="setupConfirmPassword">Confirm password *</label><input id="setupConfirmPassword" type="password" required minlength="10" autocomplete="new-password"></div>':'<div class="auth-field"><label for="authUsername">Username *</label><input id="authUsername" required autocomplete="username"></div><div class="auth-field"><label for="authPassword">Password *</label><input id="authPassword" type="password" required autocomplete="current-password"></div>';$('#authForm').dataset.mode=setup?'setup':'login';$('#authSubmit').textContent=setup?'Create Superuser account':'Sign in';$('#authFootnote').textContent='This offline login is saved in this browser only. Accounts and trainee data do not sync to other computers.'}
 async function handleAuthSubmit(e){e.preventDefault();const mode=$('#authForm').dataset.mode;$('#authMessage').classList.add('hidden');try{if(mode==='setup'){if(authUsers.some(u=>u.role==='superuser')){renderAuthScreen();showAuthMessage('The Superuser account is already set up. Please sign in.');return}const displayName=$('#setupDisplayName').value.trim(),username=$('#setupUsername').value.trim().toLowerCase(),password=$('#setupPassword').value,confirmPassword=$('#setupConfirmPassword').value;if(!displayName)throw new Error('Enter your name.');if(!/^[a-z0-9._-]{3,32}$/.test(username))throw new Error('Use a valid username with 3–32 letters, numbers, dots, underscores, or hyphens.');if(password.length<10)throw new Error('Use a password with at least 10 characters.');if(password!==confirmPassword)throw new Error('The passwords do not match.');const salt=makeSalt(),passwordHash=await hashPassword(password,salt),owner={id:uuid(),displayName,username,role:'superuser',active:true,salt,passwordHash,createdAt:new Date().toISOString()};authUsers.unshift(owner);if(!saveAuthUsers()){authUsers=authUsers.filter(u=>u.id!==owner.id);return}enterApp(owner);toast('Superuser account created','You now have full access. Keep your password private.');return}const username=$('#authUsername').value.trim().toLowerCase(),password=$('#authPassword').value,user=authUsers.find(u=>String(u.username||'').toLowerCase()===username&&u.active!==false);if(!user){showAuthMessage('Username or password is incorrect, or the account is disabled.');return}const hash=await hashPassword(password,user.salt);if(hash!==user.passwordHash){showAuthMessage('Username or password is incorrect, or the account is disabled.');return}enterApp(user)}catch(err){showAuthMessage(err.message||'Could not sign in. Please try again.')}}
-function enterApp(user){currentUser=user;$('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');$('#sessionRoleChip').textContent=isSuperuser()?'SUPERUSER · FULL ACCESS':'ADMIN · LIMITED ACCESS';$('#userNav').classList.toggle('hidden',!isSuperuser());$('#importBtn').classList.toggle('hidden',!isSuperuser());$('#exportBtn').classList.toggle('hidden',!isSuperuser());$('#dashboardView h1').textContent='Good day, '+(user.displayName||user.username||'Trainer')+'.';switchView('dashboard');render()}
+function enterApp(user){currentUser=user;$('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');$('#sessionRoleChip').textContent=isSuperuser()?'SUPERUSER · FULL ACCESS':'ADMIN · LIMITED ACCESS';$('#userNav').classList.toggle('hidden',!isSuperuser());$('#importBtn').classList.toggle('hidden',!isSuperuser());$('#exportBtn').classList.toggle('hidden',!isSuperuser());$('#dashboardView h1').textContent='Good day, '+(user.displayName||user.username||'Trainer')+'.';switchView('dashboard');render();processExistingQaPdfs()}
 function logout(){currentUser=null;modal=null;$('#modalBackdrop').classList.add('hidden');$('#importBackdrop').classList.add('hidden');$('#passwordBackdrop').classList.add('hidden');$('#adminResetBackdrop').classList.add('hidden');$('#appShell').classList.add('hidden');$('#authScreen').classList.remove('hidden');renderAuthScreen()}
 function showPasswordDialog(){if(!currentUser)return;$('#passwordForm').reset();$('#passwordMessage').textContent='';$('#passwordMessage').classList.add('hidden');$('#passwordBackdrop').classList.remove('hidden')}
 async function handleChangePassword(e){e.preventDefault();if(!currentUser)return;const message=$('#passwordMessage');message.classList.add('hidden');try{const oldPassword=$('#currentPassword').value,newPassword=$('#newPassword').value,confirmPassword=$('#confirmNewPassword').value,oldHash=await hashPassword(oldPassword,currentUser.salt);if(oldHash!==currentUser.passwordHash)throw new Error('Your current password is incorrect.');if(newPassword.length<10)throw new Error('Use a new password with at least 10 characters.');if(newPassword!==confirmPassword)throw new Error('The new passwords do not match.');currentUser.salt=makeSalt();currentUser.passwordHash=await hashPassword(newPassword,currentUser.salt);if(!saveAuthUsers())return;$('#passwordBackdrop').classList.add('hidden');toast('Password updated','Your new password is now active for this browser.')}catch(err){message.textContent=err.message||'Could not update the password.';message.classList.remove('hidden')}}
