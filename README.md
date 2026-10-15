@@ -33,6 +33,17 @@ Upload the downloaded `Kanako_Offline_Workbench.html` file to the repository roo
 - Do not clear the browser's site data if you need to preserve local files.
 - Do not commit personal records, secrets, or QA evidence to this repository.
 
+## Online website (GitHub Pages)
+
+The `.github/workflows/deploy-pages.yml` workflow prepares the app as `index.html` and deploys it to GitHub Pages when the app source or deployment workflow changes on `main`.
+
+Expected website address:
+`https://kanakomaeda.github.io/kanako-offline/`
+
+GitHub Pages must be available for this repository plan, and the repository's **Settings → Pages → Build and deployment → Source** must be set to **GitHub Actions**. If deployment fails with a Pages configuration or plan error, check those repository settings. GitHub Pages sites are publicly reachable even if the source repository is private; don't publish sensitive information in the static app.
+
+The online version is static hosting only. The login and roles run in the browser; workspace records are saved to local browser storage, and PDFs/MP4s to that browser's IndexedDB. They do not sync to a shared account or database. Admin/Superuser permissions in the current offline app are not a secure server-side access-control system. Do not use this deployment to protect sensitive trainee information or confidential media. Real multi-user access across devices requires a server-backed authentication system and database.
+
 ## Development workflow
 
 The code committed to this GitHub repository is the development record. Code updates should be committed to this repository and the Actions workflow rebuilds the downloadable package after each push to `main`.
