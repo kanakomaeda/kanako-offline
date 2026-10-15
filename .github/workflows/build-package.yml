@@ -1,0 +1,32 @@
+name: Build Kanako Offline Package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Validate offline HTML exists
+        run: test -s index.html
+      - name: Package offline app
+        run: |
+          mkdir -p dist
+          cp index.html dist/Kanako_Offline_Workbench.html
+          cp README.md dist/README.md
+          cd dist
+          zip -9 Kanako_Offline_Workbench_Package.zip Kanako_Offline_Workbench.html README.md
+      - name: Upload downloadable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kanako-offline-package
+          path: dist/Kanako_Offline_Workbench_Package.zip
+          if-no-files-found: error
+          retention-days: 30
