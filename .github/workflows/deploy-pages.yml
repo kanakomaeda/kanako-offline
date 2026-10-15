@@ -1,0 +1,73 @@
+name: Deploy Kanako Progress Hub to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Kanako_Offline_Workbench.html"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate embedded JavaScript syntax
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('Kanako_Offline_Workbench.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
+          scripts.forEach((match, index) => {
+            new Function(match[1]);
+            console.log('JavaScript block ' + (index + 1) + ' parsed successfully.');
+          });
+          NODE
+
+      - name: Prepare website
+        shell: bash
+        run: |
+          mkdir -p _site
+          cp Kanako_Offline_Workbench.html _site/index.html
+          touch _site/.nojekyll
+          cat > _site/README-ONLINE.txt <<'EOF'
+          Kanako Progress Hub - online static version
+
+          This is a browser-hosted static application. User accounts, records, and PDF/MP4 evidence files are stored locally in each browser/device and do not sync between users or devices.
+
+          The in-app login is a client-side access gate, not server-enforced authentication. Do not rely on it to protect sensitive information or to secure publicly accessible data.
+          EOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Publish website
+        id: deployment
+        uses: actions/deploy-pages@v4
