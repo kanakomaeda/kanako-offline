@@ -168,7 +168,7 @@ function getPdfField(rows,labelPattern){
         if(clean)values.push(clean);
       }
       const isClientField=/Client|Account/i.test(labelPattern);
-      const previousIsBlankWeekLabel=i>0&&/^(?:Call Week|Audit Week|Week of Audit)\\s*:?\\s*$/i.test(rows[i-1].text.trim());
+      const previousIsBlankWeekLabel=i>0&&/^(?:Call Week|Audit Week|Week of Audit)\s*:?\s*$/i.test(rows[i-1].text.trim());
       const preferred=values[isClientField&&previousIsBlankWeekLabel?1:0];
       if(preferred)return preferred;
       if(values.length)return values[0];
