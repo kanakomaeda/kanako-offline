@@ -628,7 +628,15 @@ async function compressMp4ForCloud(file){
  let mediaURL=null;
  try{
   if(typeof VideoEncoder==='undefined'||typeof VideoDecoder==='undefined')throw new Error('This browser does not expose WebCodecs video encoding. Open Kanako in an up-to-date Google Chrome or Microsoft Edge.');
-  const {Input,ALL_FORMATS,BlobSource,Output,BufferTarget,Mp4OutputFormat,Conversion,Quality}=await getKanakoMediabunny();
+  const {Input,ALL_FORMATS,BlobSource,Output,BufferTarget,Mp4OutputFormat,Conversion,Quality,canEncodeAudio}=await getKanakoMediabunny();
+  // AAC encoding is not exposed by WebCodecs in every browser/platform. Load
+  // Mediabunny's AAC-LC fallback only when native AAC encoding is unavailable.
+  if(!(await canEncodeAudio('aac'))){
+   stage('Preparing compatible AAC audio encoder…');
+   const {registerAacEncoder}=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm');
+   registerAacEncoder();
+   if(!(await canEncodeAudio('aac')))throw new Error('AAC audio encoding is unavailable in this browser. Update Chrome or Edge and try again. The original recording is preserved.');
+  }
   const input=new Input({source:new BlobSource(file),formats:ALL_FORMATS});
   const duration=await input.computeDuration();
   if(!Number.isFinite(duration)||duration<=0)throw new Error('Could not read the MP4 duration.');
