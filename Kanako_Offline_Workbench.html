@@ -615,7 +615,7 @@ async function getKanakoFfmpeg(){
  })();
  return kanakoFfmpegPromise
 }
-let kanakoMediabunnyPromise=null;
+let kanakoMediabunnyPromise=null;let kanakoAacEncoderPromise=null;async function getKanakoAacEncoder(){if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm');return kanakoAacEncoderPromise;}
 async function getKanakoMediabunny(){
  if(!kanakoMediabunnyPromise)kanakoMediabunnyPromise=import('https://cdn.jsdelivr.net/npm/mediabunny@1.52.0/+esm');
  return kanakoMediabunnyPromise;
@@ -633,7 +633,7 @@ async function compressMp4ForCloud(file){
   // Mediabunny's AAC-LC fallback only when native AAC encoding is unavailable.
   if(!(await canEncodeAudio('aac'))){
    stage('Preparing compatible AAC audio encoder…');
-   const {registerAacEncoder}=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm');
+   const {registerAacEncoder}=await getKanakoAacEncoder();
    registerAacEncoder();
    if(!(await canEncodeAudio('aac')))throw new Error('AAC audio encoding is unavailable in this browser. Update Chrome or Edge and try again. The original recording is preserved.');
   }
@@ -655,8 +655,8 @@ async function compressMp4ForCloud(file){
   const sourceAwareVideoBitrate=Math.floor(sourceTotalBitsPerSecond*0.78)-audioBitrate;
   const videoBitrate=Math.max(64000,Math.min(4500000,budgetVideoBitrate,sourceAwareVideoBitrate));
   stage('Compressing MP4 with browser hardware acceleration… 0%');
-  const output=new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
-  const conversionOptions={
+  const createOutput=()=>new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
+  const createConversion=output=>({
    input,output,
    video:async videoTrack=>({
     codec:'avc',
@@ -669,17 +669,19 @@ async function compressMp4ForCloud(file){
     forceTranscode:true
    }),
    audio:async audioTrack=>({codec:'aac',quality:new Quality({bitrate:audioBitrate})})
-  };
-  let conversion=await Conversion.init(conversionOptions);
+  });
+  let output=createOutput();
+  let conversion=await Conversion.init(createConversion(output));
   const audioEncoderMissing=()=>conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec');
   // canEncodeAudio() can pass a general capability check even when the actual
   // track parameters cannot be encoded natively. Retry with the registered AAC
   // extension if Conversion.init reports that it had to discard an audio track.
   if(audioEncoderMissing()){
    stage('Preparing alternate AAC encoder to preserve audio…');
-   const {registerAacEncoder}=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm?deps=mediabunny@1.52.0');
+   const {registerAacEncoder}=await getKanakoAacEncoder();
    registerAacEncoder();
-   conversion=await Conversion.init(conversionOptions);
+   output=createOutput();
+   conversion=await Conversion.init(createConversion(output));
   }
   if(conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec')){
    throw new Error('Kanako could not encode the MP4 audio track, even with the alternate AAC encoder. The compressed copy was not uploaded, so a silent video will not replace your original. Try an updated Chrome or Edge browser.');
