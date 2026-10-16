@@ -669,11 +669,32 @@ async function getKanakoAacEncoder(){
  if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://esm.sh/@mediabunny/aac-encoder@1.52.0?external=mediabunny');
  return kanakoAacEncoderPromise;
 }
+async function compressMp4WithFfmpegFallback(file,maxBytes,stage){
+ stage('Trying compatibility MP4 encoder (FFmpeg)…');
+ const ffmpeg=await getKanakoFfmpeg();
+ const inputName='kanako-fallback-input.mp4',outputName='kanako-fallback-output.mp4';
+ try{
+  await ffmpeg.writeFile(inputName,new Uint8Array(await file.arrayBuffer()));
+  const attempts=[{width:1280,crf:29,audio:'64k'},{width:960,crf:32,audio:'48k'},{width:720,crf:35,audio:'48k'}];
+  for(const attempt of attempts){
+   stage('Re-encoding MP4 audio/video with compatibility fallback…');
+   await ffmpeg.exec(['-y','-i',inputName,'-map','0:v:0','-map','0:a?','-vf',"scale=w='min("+attempt.width+",iw)':h=-2",'-c:v','libx264','-preset','veryfast','-crf',String(attempt.crf),'-pix_fmt','yuv420p','-c:a','aac','-b:a',attempt.audio,'-movflags','+faststart',outputName]);
+   const encoded=await ffmpeg.readFile(outputName);
+   if(!(encoded instanceof Uint8Array)||!encoded.length)throw new Error('FFmpeg did not produce a readable MP4 output.');
+   const compressed=new File([encoded],file.name.replace(/\.mp4$/i,'')+'-kanako-compressed.mp4',{type:'video/mp4',lastModified:Date.now()});
+   if(compressed.size<=maxBytes&&compressed.size<file.size)return compressed;
+  }
+  throw new Error('FFmpeg could not reduce this recording below the 48 MiB cloud limit without exceeding the current compression attempts.');
+ }finally{
+  try{await ffmpeg.deleteFile(inputName)}catch(_){}
+  try{await ffmpeg.deleteFile(outputName)}catch(_){}
+ }
+}
 async function compressMp4ForCloud(file){
  const MAX_CLOUD_BYTES=48*1024*1024;
  const stage=(message)=>{cloudSyncDetail=message;renderSync()};
  if(file.size<=MAX_CLOUD_BYTES)return file;
- stage('Preparing fast, hardware-assisted MP4 compression…');
+ stage('Preparing browser-compatible MP4 compression…');
  let mediaURL=null;
  try{
   if(typeof VideoEncoder==='undefined'||typeof VideoDecoder==='undefined')throw new Error('This browser does not expose WebCodecs video encoding. Open Kanako in an up-to-date Google Chrome or Microsoft Edge.');
@@ -707,7 +728,7 @@ async function compressMp4ForCloud(file){
   const budgetVideoBitrate=targetTotalBitsPerSecond-audioBitrate;
   const sourceAwareVideoBitrate=Math.floor(sourceTotalBitsPerSecond*0.78)-audioBitrate;
   const videoBitrate=Math.max(64000,Math.min(4500000,budgetVideoBitrate,sourceAwareVideoBitrate));
-  stage('Compressing MP4 with browser hardware acceleration… 0%');
+  stage('Compressing MP4 with browser-compatible encoder… 0%');
   const createOutput=()=>new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
   const createConversion=output=>({
    input,output,
@@ -752,7 +773,7 @@ async function compressMp4ForCloud(file){
   if(!conversion.isValid)throw new Error('This MP4 uses a format or codec that this browser cannot convert. The original recording has been preserved.');
   conversion.onProgress=progress=>{
    const pct=Math.max(0,Math.min(100,Math.round(progress*100)));
-   stage('Compressing MP4 with browser hardware acceleration… '+pct+'%');
+   stage('Compressing MP4 with browser-compatible encoder… '+pct+'%');
   };
   await conversion.execute();
   const buffer=output.target.buffer;
@@ -767,8 +788,15 @@ async function compressMp4ForCloud(file){
   stage('Compression complete: '+savedPct+'% smaller. Saving original and compressed copy…');
   return compressed;
  }catch(err){
-  console.warn('Kanako in-app MP4 compression failed:',err);
-  throw new Error((err?.message||'In-app MP4 compression failed.')+' Original recording is still preserved on this device.');
+  console.warn('Kanako in-app MP4 compression failed; trying FFmpeg compatibility fallback:',err);
+  try{
+   const fallback=await compressMp4WithFfmpegFallback(file,MAX_CLOUD_BYTES,stage);
+   stage('Compatibility compression complete. Preparing cloud upload…');
+   return fallback;
+  }catch(fallbackErr){
+   console.error('Kanako FFmpeg MP4 fallback failed:',fallbackErr);
+   throw new Error('Browser MP4 encoding failed: '+(err?.message||'Unknown encoding error')+'. Compatibility fallback also failed: '+(fallbackErr?.message||'Unknown FFmpeg error')+'. Original recording is still preserved on this device.');
+  }
  }finally{
   if(mediaURL)URL.revokeObjectURL(mediaURL);
  }
