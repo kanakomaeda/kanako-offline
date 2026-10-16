@@ -427,7 +427,7 @@ async function uploadPendingCloudFiles(){
     if(cached?.blob&&cached.size<=48*1024*1024){file=new File([cached.blob],cached.name||file.name,{type:'video/mp4'});try{localStorage.removeItem(attemptKey)}catch(_){}}
     else{
      let previous=null;try{previous=JSON.parse(localStorage.getItem(attemptKey)||'null')}catch(_){}
-     if(previous)throw new Error(previous.error||'A previous MP4 compression was interrupted, so Kanako paused automatic retries to protect Chrome. Re-upload the MP4 from Edit details to retry.');
+     if(previous){compressionStarted=true;throw new Error(previous.error||'A previous MP4 compression was interrupted, so Kanako paused automatic retries to protect Chrome. Re-upload the MP4 from Edit details to retry.')}
      compressionStarted=true;
      try{localStorage.setItem(attemptKey,JSON.stringify({started_at:new Date().toISOString(),status:'processing'}))}catch(_){}
      cloudSyncDetail='Compressing MP4 before cloud upload…';renderSync();
