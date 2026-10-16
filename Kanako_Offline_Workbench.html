@@ -409,7 +409,7 @@ async function uploadPendingCloudFiles(){
  let changed=false,failed=0;
  for(const f of (data.files||[]))for(const part of [{key:'pdf_file_id',path:'pdf_storage_path',kind:'pdf',name:'pdf_original_name',type:'pdf_content_type'},{key:'mp4_file_id',path:'mp4_storage_path',kind:'mp4',name:'mp4_original_name',type:'mp4_content_type'}]){
   if(!f[part.key]||f[part.path])continue;
-  try{const media=await getMedia(f[part.key]);if(!media?.blob)continue;const file=new File([media.blob],f[part.name]||media.name||('evidence.'+part.kind),{type:f[part.type]||media.type||(part.kind==='mp4'?'video/mp4':'application/pdf')});const uploaded=await uploadCloudFile(f.id,part.kind,file);f[part.path]=uploaded.path;f.sync_status='Cloud synced';changed=true}
+  try{const media=await getMedia(f[part.key]);if(!media?.blob)continue;let file=new File([media.blob],f[part.name]||media.name||('evidence.'+part.kind),{type:f[part.type]||media.type||(part.kind==='mp4'?'video/mp4':'application/pdf')});if(part.kind==='mp4'&&file.size>50*1024*1024){file=await compressMp4ForCloud(file)}const uploaded=await uploadCloudFile(f.id,part.kind,file);f[part.path]=uploaded.path;f.sync_status='Cloud synced';changed=true}
   catch(err){failed++;console.warn('Kanako file upload pending:',err?.message||err)}
  }
  for(const a of (data.audits||[])){
