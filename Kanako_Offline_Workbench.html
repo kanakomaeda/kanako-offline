@@ -435,7 +435,7 @@ async function initializeCloudWorkspace(){
    if(additions){await uploadPendingCloudFiles();const rows=asCloudRows(data).filter(r=>addedByType[r.record_type]?.has(r.record_key));for(let i=0;i<rows.length;i+=250)await cloudRequest('data-sync',{upsert:rows.slice(i,i+250),deletes:[]});response=await cloudRequest('data-pull');remoteRows=response.records||[];remoteData=cloudRowsToData(remoteRows)}
   }
  }
- data=remoteData;cloudBaseline=cloudMaps(remoteData);save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();renderSync();
+ data=remoteData;cloudBaseline=cloudMaps(clone(remoteData));save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();renderSync();
 }
 async function pushAllLocalData(){const rows=asCloudRows(data);for(let i=0;i<rows.length;i+=250)await cloudRequest('data-sync',{upsert:rows.slice(i,i+250),deletes:[]})}
 async function syncCloudNow(force=false){
@@ -447,7 +447,7 @@ async function syncCloudNow(force=false){
   const batches=Math.max(Math.ceil(upsert.length/250),Math.ceil(deletes.length/250));for(let i=0;i<batches;i++)await cloudRequest('data-sync',{upsert:upsert.slice(i*250,(i+1)*250),deletes:deletes.slice(i*250,(i+1)*250)});
   const result=await cloudRequest('data-pull'),remoteData=cloudRowsToData(result.records||[]),remoteMaps=cloudMaps(remoteData),latest=clone(data),latestMaps=cloudMaps(latest),localMapsNow=cloudMaps(local);
   for(const type of CLOUD_COLLECTIONS){const merged=remoteData[type]||[],byId=new Map(merged.map(x=>[String(x.id),x])),localType=localMapsNow[type]||{},latestType=latestMaps[type]||{};for(const [id,item] of Object.entries(latestType))if(!sameRecord(item,localType[id]))byId.set(id,item);for(const id of Object.keys(localType))if(!latestType[id])byId.delete(id);remoteData[type]=[...byId.values()]}
-  data=remoteData;cloudBaseline=remoteMaps;save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();render();
+  data=remoteData;cloudBaseline=cloudMaps(clone(remoteData));save(true);cloudReady=true;cloudSyncStatus='synced';cloudLastSyncAt=new Date().toISOString();render();
   const mergedMaps=cloudMaps(data);let pending=false;for(const type of CLOUD_COLLECTIONS){const base=cloudBaseline[type]||{};for(const [id,item] of Object.entries(mergedMaps[type]||{}))if(!base[id]||!sameRecord(item,base[id]))pending=true;for(const id of Object.keys(base))if(!mergedMaps[type][id])pending=true}if(pending)scheduleCloudSync();
  }catch(err){cloudSyncStatus='error';renderSync();console.warn('Kanako cloud sync failed:',err?.message||err);throw err}
  finally{cloudSyncRunning=false;if(cloudSyncAgain){cloudSyncAgain=false;scheduleCloudSync()}}
