@@ -589,7 +589,7 @@ function closeModal(){$('#modalBackdrop').classList.add('hidden');modal=null}
 let kanakoFfmpegPromise=null;
 async function kanakoBlobUrl(url,mime){const response=await fetch(url);if(!response.ok)throw new Error('Could not load the video compressor ('+response.status+').');return URL.createObjectURL(new Blob([await response.arrayBuffer()],{type:mime}))}
 async function getKanakoFfmpeg(){
- if(!kanakoFfmpegPromise)kanakoFfmpegPromise=(async()=>{const {FFmpeg}=await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');const ffmpeg=new FFmpeg();const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';const coreURL=await kanakoBlobUrl(base+'/ffmpeg-core.js','text/javascript');const wasmURL=await kanakoBlobUrl(base+'/ffmpeg-core.wasm','application/wasm');try{await ffmpeg.load({coreURL,wasmURL})}catch(err){URL.revokeObjectURL(coreURL);URL.revokeObjectURL(wasmURL);throw err}return ffmpeg})();return kanakoFfmpegPromise
+ if(!kanakoFfmpegPromise)kanakoFfmpegPromise=(async()=>{const {FFmpeg}=await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');const ffmpeg=new FFmpeg();const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';const coreURL=await kanakoBlobUrl(base+'/ffmpeg-core.js','text/javascript');const wasmURL=await kanakoBlobUrl(base+'/ffmpeg-core.wasm','application/wasm');try{await ffmpeg.load({coreURL,wasmURL})}finally{URL.revokeObjectURL(coreURL);URL.revokeObjectURL(wasmURL)}return ffmpeg})();return kanakoFfmpegPromise
 }
 async function compressMp4ForCloud(file){
  const targetBytes=48*1024*1024;
