@@ -656,7 +656,7 @@ async function compressMp4ForCloud(file){
   const videoBitrate=Math.max(64000,Math.min(4500000,budgetVideoBitrate,sourceAwareVideoBitrate));
   stage('Compressing MP4 with browser hardware acceleration… 0%');
   const output=new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
-  const conversion=await Conversion.init({
+  const conversionOptions={
    input,output,
    video:async videoTrack=>({
     codec:'avc',
@@ -669,7 +669,21 @@ async function compressMp4ForCloud(file){
     forceTranscode:true
    }),
    audio:async audioTrack=>({codec:'aac',quality:new Quality({bitrate:audioBitrate})})
-  });
+  };
+  let conversion=await Conversion.init(conversionOptions);
+  const audioEncoderMissing=()=>conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec');
+  // canEncodeAudio() can pass a general capability check even when the actual
+  // track parameters cannot be encoded natively. Retry with the registered AAC
+  // extension if Conversion.init reports that it had to discard an audio track.
+  if(audioEncoderMissing()){
+   stage('Preparing alternate AAC encoder to preserve audio…');
+   const {registerAacEncoder}=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm?deps=mediabunny@1.52.0');
+   registerAacEncoder();
+   conversion=await Conversion.init(conversionOptions);
+  }
+  if(conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec')){
+   throw new Error('Kanako could not encode the MP4 audio track, even with the alternate AAC encoder. The compressed copy was not uploaded, so a silent video will not replace your original. Try an updated Chrome or Edge browser.');
+  }
   if(!conversion.isValid)throw new Error('This MP4 uses a format or codec that this browser cannot convert. The original recording has been preserved.');
   conversion.onProgress=progress=>{
    const pct=Math.max(0,Math.min(100,Math.round(progress*100)));
