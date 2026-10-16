@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script type="importmap">{"imports":{"mediabunny":"https://esm.sh/mediabunny@1.52.0"}}</script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f7fb">
 <title>Kanako Progress Hub</title>
 <style>
@@ -621,7 +622,7 @@ async function getKanakoMediabunny(){
  return kanakoMediabunnyPromise;
 }
 async function getKanakoAacEncoder(){
- if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://esm.sh/@mediabunny/aac-encoder@1.52.0?deps=mediabunny@1.52.0');
+ if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://esm.sh/@mediabunny/aac-encoder@1.52.0?external=mediabunny');
  return kanakoAacEncoderPromise;
 }
 async function compressMp4ForCloud(file){
