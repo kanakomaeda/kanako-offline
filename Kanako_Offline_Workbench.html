@@ -638,9 +638,14 @@ async function compressMp4ForCloud(file){
   const sourceWidth=await track.getDisplayWidth();
   const height=Math.min(720,sourceHeight||720);
   const width=Math.max(2,Math.round((sourceWidth||1280)*height/(sourceHeight||720)/2)*2);
-  // Estimate a target bitrate that leaves room for audio and MP4 overhead under 48 MiB.
-  const targetTotalBitsPerSecond=Math.floor((MAX_CLOUD_BYTES*8*0.94)/duration);
-  const videoBitrate=Math.max(350000,Math.min(4500000,targetTotalBitsPerSecond-96000));
+  // Aim comfortably below the cloud limit, and never ask the encoder for a higher
+  // video bitrate than the source can justify (otherwise a low-bitrate source can grow).
+  const targetTotalBitsPerSecond=Math.floor((MAX_CLOUD_BYTES*8*0.88)/duration);
+  const sourceTotalBitsPerSecond=Math.floor((file.size*8)/duration);
+  const audioBitrate=duration>1800?32000:duration>900?48000:64000;
+  const budgetVideoBitrate=targetTotalBitsPerSecond-audioBitrate;
+  const sourceAwareVideoBitrate=Math.floor(sourceTotalBitsPerSecond*0.78)-audioBitrate;
+  const videoBitrate=Math.max(64000,Math.min(4500000,budgetVideoBitrate,sourceAwareVideoBitrate));
   stage('Compressing MP4 with browser hardware acceleration… 0%');
   const output=new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
   const conversion=await Conversion.init({
@@ -655,7 +660,7 @@ async function compressMp4ForCloud(file){
     hardwareAcceleration:'prefer-hardware',
     forceTranscode:true
    }),
-   audio:async audioTrack=>({codec:'aac',quality:new Quality({bitrate:96000})})
+   audio:async audioTrack=>({codec:'aac',quality:new Quality({bitrate:audioBitrate})})
   });
   if(!conversion.isValid)throw new Error('This MP4 uses a format or codec that this browser cannot convert. The original recording has been preserved.');
   conversion.onProgress=progress=>{
@@ -667,11 +672,11 @@ async function compressMp4ForCloud(file){
   if(!buffer)throw new Error('The compressor did not produce an MP4 file.');
   const compressed=new File([buffer],file.name.replace(/\.mp4$/i,'')+'-kanako-compressed.mp4',{type:'video/mp4',lastModified:Date.now()});
   const savedPct=Math.round((1-compressed.size/file.size)*100);
-  if(compressed.size>=file.size)throw new Error('Compression did not reduce this file size. Original recording remains unchanged.');
   if(compressed.size>MAX_CLOUD_BYTES){
    const sizeMB=(compressed.size/1024/1024).toFixed(1);
    throw new Error('The compressed copy is '+sizeMB+' MB, still above Kanako’s 48 MB cloud target. The original recording remains unchanged. This recording may be too long for the current upload limit at the selected quality.');
   }
+  if(compressed.size>=file.size)throw new Error('The encoded copy was not smaller than the original. Kanako kept the original recording unchanged.');
   stage('Compression complete: '+savedPct+'% smaller. Saving original and compressed copy…');
   return compressed;
  }catch(err){
