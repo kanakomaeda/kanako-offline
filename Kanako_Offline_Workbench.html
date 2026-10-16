@@ -616,31 +616,12 @@ async function getKanakoFfmpeg(){
  return kanakoFfmpegPromise
 }
 let kanakoMediabunnyPromise=null;let kanakoAacEncoderPromise=null;
-function loadKanakoScriptOnce(url){
- return new Promise((resolve,reject)=>{
-  const existing=[...document.scripts].find(script=>script.src===url);
-  if(existing){if(existing.dataset.loaded==='true'){resolve();return}existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(new Error('Could not load media encoder library: '+url)),{once:true});return}
-  const script=document.createElement('script');script.src=url;script.async=true;
-  script.onload=()=>{script.dataset.loaded='true';resolve()};
-  script.onerror=()=>reject(new Error('Could not load media encoder library: '+url));
-  document.head.appendChild(script);
- });
-}
 async function getKanakoMediabunny(){
- if(!kanakoMediabunnyPromise)kanakoMediabunnyPromise=(async()=>{
-  await loadKanakoScriptOnce('https://cdn.jsdelivr.net/npm/mediabunny@1.52.0/dist/bundles/mediabunny.min.cjs');
-  if(!window.Mediabunny)throw new Error('Mediabunny global bundle did not initialize.');
-  return window.Mediabunny;
- })();
+ if(!kanakoMediabunnyPromise)kanakoMediabunnyPromise=import('https://esm.sh/mediabunny@1.52.0');
  return kanakoMediabunnyPromise;
 }
 async function getKanakoAacEncoder(){
- if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=(async()=>{
-  await getKanakoMediabunny();
-  await loadKanakoScriptOnce('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/dist/bundles/mediabunny-aac-encoder.min.cjs');
-  if(!window.MediabunnyAacEncoder?.registerAacEncoder)throw new Error('The compatible AAC encoder bundle did not initialize.');
-  return window.MediabunnyAacEncoder;
- })();
+ if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://esm.sh/@mediabunny/aac-encoder@1.52.0?deps=mediabunny@1.52.0');
  return kanakoAacEncoderPromise;
 }
 async function compressMp4ForCloud(file){
