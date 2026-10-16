@@ -596,7 +596,7 @@ async function getKanakoFfmpeg(){
    const ffmpeg=new FFmpeg();
    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
    const packageBase='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
-   stage='preparing FFmpeg JavaScript core';coreURL=base+'/ffmpeg-core.js';
+   stage='preparing FFmpeg ES-module core';coreURL='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js';
    stage='downloading FFmpeg WebAssembly core';wasmURL=await kanakoBlobUrl(base+'/ffmpeg-core.wasm','application/wasm');
    stage='downloading FFmpeg worker';const response=await fetch(packageBase+'/worker.js');
    if(!response.ok)throw new Error('Worker download failed (HTTP '+response.status+').');
