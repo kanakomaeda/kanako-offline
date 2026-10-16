@@ -615,7 +615,7 @@ async function getKanakoFfmpeg(){
  })();
  return kanakoFfmpegPromise
 }
-let kanakoMediabunnyPromise=null;
+let kanakoMediabunnyPromise=null;let kanakoAacEncoderPromise=null;async function getKanakoAacEncoder(){if(!kanakoAacEncoderPromise)kanakoAacEncoderPromise=import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm');return kanakoAacEncoderPromise;}
 async function getKanakoMediabunny(){
  if(!kanakoMediabunnyPromise)kanakoMediabunnyPromise=import('https://cdn.jsdelivr.net/npm/mediabunny@1.52.0/+esm');
  return kanakoMediabunnyPromise;
@@ -633,7 +633,7 @@ async function compressMp4ForCloud(file){
   // Mediabunny's AAC-LC fallback only when native AAC encoding is unavailable.
   if(!(await canEncodeAudio('aac'))){
    stage('Preparing compatible AAC audio encoder…');
-   const {registerAacEncoder}=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.52.0/+esm');
+   const {registerAacEncoder}=await getKanakoAacEncoder();
    registerAacEncoder();
    if(!(await canEncodeAudio('aac')))throw new Error('AAC audio encoding is unavailable in this browser. Update Chrome or Edge and try again. The original recording is preserved.');
   }
