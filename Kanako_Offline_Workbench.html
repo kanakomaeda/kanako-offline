@@ -622,14 +622,16 @@ async function compressMp4ForCloud(file){
  const input='kanako-input.mp4',output='kanako-output.mp4';
  try{
   await ffmpeg.writeFile(input,new Uint8Array(await file.arrayBuffer()));
-  for(const crf of [28,32,36]){
-   toast('Compressing MP4','Optimizing video quality (pass '+([28,32,36].indexOf(crf)+1)+' of 3). Keep Kanako open.');
+  // Downscale to 720p and cap at 24 fps so browser-side WASM has far fewer frames/pixels to encode.
+  // Start with one fast, balanced encode; only retry once at a smaller bitrate if needed.
+  for(const [crf,pass] of [[32,1],[38,2]]){
+   toast('Compressing MP4','Fast optimization (pass '+pass+' of 2 max): 720p / 24 fps. Keep Kanako open.');
    try{await ffmpeg.deleteFile(output)}catch(_){}
-   await ffmpeg.exec(['-i',input,'-map','0:v:0','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf',String(crf),'-c:a','aac','-b:a','96k','-movflags','+faststart',output]);
+   await ffmpeg.exec(['-i',input,'-map','0:v:0','-map','0:a?','-vf','scale=-2:720:force_original_aspect_ratio=decrease,fps=24','-c:v','libx264','-preset','ultrafast','-threads','0','-crf',String(crf),'-c:a','aac','-b:a','64k','-movflags','+faststart',output]);
    const bytes=await ffmpeg.readFile(output);
-   if(bytes.length<=targetBytes){const baseName=file.name.replace(/\.mp4$/i,'');const compressed=new File([bytes],baseName+'-compressed.mp4',{type:'video/mp4',lastModified:file.lastModified});toast('MP4 compressed','Reduced from '+(file.size/1048576).toFixed(1)+' MB to '+(compressed.size/1048576).toFixed(1)+' MB. The original file is unchanged.');return compressed}
+   if(bytes.length<=targetBytes){const baseName=file.name.replace(/\\.mp4$/i,'');const compressed=new File([bytes],baseName+'-compressed.mp4',{type:'video/mp4',lastModified:file.lastModified});toast('MP4 compressed','Reduced from '+(file.size/1048576).toFixed(1)+' MB to '+(compressed.size/1048576).toFixed(1)+' MB. Cloud copy is optimized to 720p/24 fps; the original file is unchanged.');return compressed}
   }
-  throw new Error('The video is still larger than 48 MB after compression. Please choose a shorter/lower-resolution recording; the original file was not changed.');
+  throw new Error('The video is still larger than 48 MB after two fast compression passes. Please choose a shorter recording; the original file was not changed.');
  }catch(err){if(String(err?.message||'').includes('larger than 48 MB'))throw err;throw new Error('Automatic MP4 compression failed. The original file was not changed. '+(err?.message||''))}
  finally{cloudSyncDetail='';renderSync();try{await ffmpeg.deleteFile(input)}catch(_){}try{await ffmpeg.deleteFile(output)}catch(_){}}
 }
