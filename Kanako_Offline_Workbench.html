@@ -718,7 +718,7 @@ async function compressMp4ForCloud(file){
     fit:'contain',
     frameRate:24,
     quality:new Quality({bitrate:videoBitrate}),
-    hardwareAcceleration:'prefer-hardware',
+    hardwareAcceleration:'no-preference',
     forceTranscode:true
    }),
    audio:async audioTrack=>({codec:'aac',quality:new Quality({bitrate:audioBitrate})})
