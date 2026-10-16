@@ -633,14 +633,18 @@ async function compressMp4ForCloud(file){
  try{
   if(typeof VideoEncoder==='undefined'||typeof VideoDecoder==='undefined')throw new Error('This browser does not expose WebCodecs video encoding. Open Kanako in an up-to-date Google Chrome or Microsoft Edge.');
   const {Input,ALL_FORMATS,BlobSource,Output,BufferTarget,Mp4OutputFormat,Conversion,Quality,canEncodeAudio}=await getKanakoMediabunny();
-  // AAC encoding is not exposed by WebCodecs in every browser/platform. Load
-  // Mediabunny's AAC-LC fallback only when native AAC encoding is unavailable.
-  if(!(await canEncodeAudio('aac'))){
+  // Register the AAC fallback at most once. Some browsers pass the general
+  // capability check but still cannot encode the actual source audio track.
+  let aacFallbackRegistered=false;
+  const ensureAacFallback=async()=>{
+   if(aacFallbackRegistered)return;
    stage('Preparing compatible AAC audio encoder…');
    const {registerAacEncoder}=await getKanakoAacEncoder();
    registerAacEncoder();
-   if(!(await canEncodeAudio('aac')))throw new Error('AAC audio encoding is unavailable in this browser. Update Chrome or Edge and try again. The original recording is preserved.');
-  }
+   aacFallbackRegistered=true;
+  };
+  if(!(await canEncodeAudio('aac')))await ensureAacFallback();
+  if(!(await canEncodeAudio('aac')))throw new Error('AAC audio encoding is unavailable in this browser. Update Chrome or Edge and try again. The original recording is preserved.');
   const input=new Input({source:new BlobSource(file),formats:ALL_FORMATS});
   const duration=await input.computeDuration();
   if(!Number.isFinite(duration)||duration<=0)throw new Error('Could not read the MP4 duration.');
@@ -676,20 +680,30 @@ async function compressMp4ForCloud(file){
   });
   let output=createOutput();
   let conversion=await Conversion.init(createConversion(output));
-  const audioEncoderMissing=()=>conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec');
-  // canEncodeAudio() can pass a general capability check even when the actual
-  // track parameters cannot be encoded natively. Retry with the registered AAC
-  // extension if Conversion.init reports that it had to discard an audio track.
-  if(audioEncoderMissing()){
-   stage('Preparing alternate AAC encoder to preserve audio…');
-   const {registerAacEncoder}=await getKanakoAacEncoder();
-   registerAacEncoder();
+  const discardedTracks=()=>conversion.discardedTracks||[];
+  const discardedAudio=()=>discardedTracks().filter(item=>item.track?.type==='audio');
+  const discardedVideo=()=>discardedTracks().filter(item=>item.track?.type==='video');
+  // Any discarded audio track is unsafe, regardless of the reported reason.
+  // Retry once with the AAC fallback, then fail closed rather than upload silent video.
+  if(discardedAudio().length){
+   await ensureAacFallback();
    output=createOutput();
    conversion=await Conversion.init(createConversion(output));
   }
-  if(conversion.discardedTracks.some(item=>item.track?.type==='audio'&&item.reason==='no_encodable_target_codec')){
-   throw new Error('Kanako could not encode the MP4 audio track, even with the alternate AAC encoder. The compressed copy was not uploaded, so a silent video will not replace your original. Try an updated Chrome or Edge browser.');
+  const describeTracks=items=>items.map(item=>({
+   type:item.track?.type||'unknown',
+   reason:item.reason||'unspecified',
+   codec:item.track?.codec||item.track?.source?.codec||null
+  }));
+  if(discardedAudio().length){
+   console.error('Kanako MP4 conversion discarded audio track(s):',describeTracks(discardedAudio()));
+   throw new Error('Kanako could not preserve the audio track during MP4 compression. The compressed copy was not uploaded. Try an updated Chrome or Edge browser; the original recording is preserved.');
   }
+  if(discardedVideo().length){
+   console.error('Kanako MP4 conversion discarded video track(s):',describeTracks(discardedVideo()));
+   throw new Error('Kanako could not preserve the video track during MP4 compression. The compressed copy was not uploaded; the original recording is preserved.');
+  }
+  if(discardedTracks().length)console.warn('Kanako MP4 conversion discarded non-audio/video track(s):',describeTracks(discardedTracks()));
   if(!conversion.isValid)throw new Error('This MP4 uses a format or codec that this browser cannot convert. The original recording has been preserved.');
   conversion.onProgress=progress=>{
    const pct=Math.max(0,Math.min(100,Math.round(progress*100)));
