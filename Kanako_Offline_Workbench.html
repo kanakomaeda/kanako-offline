@@ -624,10 +624,10 @@ async function compressMp4ForCloud(file){
   await ffmpeg.writeFile(input,new Uint8Array(await file.arrayBuffer()));
   // Downscale to 720p and cap at 24 fps so browser-side WASM has far fewer frames/pixels to encode.
   // Start with one fast, balanced encode; only retry once at a smaller bitrate if needed.
-  for(const [crf,pass] of [[32,1],[38,2]]){
-   toast('Compressing MP4','Fast optimization (pass '+pass+' of 2 max): 720p / 24 fps. Keep Kanako open.');
+  for(const [crf,pass] of [[35,1],[42,2]]){
+   toast('Compressing MP4','Quick compression (pass '+pass+' of 2 max): 480p / 20 fps. Keep Kanako open.');
    try{await ffmpeg.deleteFile(output)}catch(_){}
-   await ffmpeg.exec(['-i',input,'-map','0:v:0','-map','0:a?','-vf','scale=-2:720:force_original_aspect_ratio=decrease,fps=24','-c:v','libx264','-preset','ultrafast','-threads','0','-crf',String(crf),'-c:a','aac','-b:a','64k','-movflags','+faststart',output]);
+   await ffmpeg.exec(['-i',input,'-map','0:v:0','-map','0:a?','-vf','scale=-2:480:force_original_aspect_ratio=decrease,fps=20','-c:v','libx264','-preset','ultrafast','-threads','0','-crf',String(crf),'-c:a','aac','-b:a','64k','-movflags','+faststart',output]);
    const bytes=await ffmpeg.readFile(output);
    if(bytes.length<=targetBytes){const baseName=file.name.replace(/\\.mp4$/i,'');const compressed=new File([bytes],baseName+'-compressed.mp4',{type:'video/mp4',lastModified:file.lastModified});toast('MP4 compressed','Reduced from '+(file.size/1048576).toFixed(1)+' MB to '+(compressed.size/1048576).toFixed(1)+' MB. Cloud copy is optimized to 720p/24 fps; the original file is unchanged.');return compressed}
   }
