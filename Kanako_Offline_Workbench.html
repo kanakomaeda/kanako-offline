@@ -649,6 +649,7 @@ async function compressMp4ForCloud(file){
     codec:'avc',
     width:Math.min(width,sourceWidth||width),
     height,
+    fit:'contain',
     frameRate:24,
     quality:new Quality({bitrate:videoBitrate}),
     hardwareAcceleration:'prefer-hardware',
