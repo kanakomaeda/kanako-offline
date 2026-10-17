@@ -412,25 +412,65 @@ Existing trainee SMART plan (context only; do not rewrite it):
 ${existingPlan || "Not provided"}
 
 Use concise bullets for strengths and improvement areas, preserving the trainer's meaning. If a category has no evidence, say "No specific evidence provided" rather than guessing. Tie expected outcomes directly to stated improvement areas and frame them as targets, not guaranteed results. discussion_feedback must contain the complete structured template including the exact SMART question and all five prompts. expected_outcome should be a concise separate paragraph with 1–3 observable outcomes.`;
-      const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
-        body: JSON.stringify({ model: "openrouter/free", temperature: 0.2, max_tokens: 1200, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], response_format: { type: "json_object" } }),
-        signal: AbortSignal.timeout(45000)
-      });
-      if (!aiResponse.ok) {
-        const detail = (await aiResponse.text()).slice(0, 500);
-        console.error("OpenRouter coaching request failed:", aiResponse.status, detail);
-        return response(origin, { error: aiResponse.status === 401 ? "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." : aiResponse.status === 429 ? "The free AI request limit has been reached. Please try again later." : "OpenRouter could not generate feedback right now. Please try again shortly." }, aiResponse.status === 429 ? 429 : 502);
+      // Free OpenRouter routes may return partial JSON or a non-string message body.
+      // Retry once with a larger output budget and without provider-specific JSON mode.
+      async function requestCoaching(useJsonMode: boolean) {
+        const payload: any = {
+          model: "openrouter/free",
+          temperature: 0.2,
+          max_tokens: useJsonMode ? 1800 : 2400,
+          messages: [
+            { role: "system", content: systemPrompt + " Output both required fields completely. Never stop mid-sentence. Keep the result concise enough to fit the output limit." },
+            { role: "user", content: userPrompt }
+          ]
+        };
+        if (useJsonMode) payload.response_format = { type: "json_object" };
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(45000)
+        });
+        if (!res.ok) {
+          const detail = (await res.text()).slice(0, 500);
+          console.error("OpenRouter coaching request failed:", res.status, detail);
+          return { ok: false as const, status: res.status };
+        }
+        const json = await res.json();
+        const message = json?.choices?.[0]?.message;
+        let content: any = message?.content;
+        if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\\n");
+        if (typeof content !== "string") content = "";
+        let parsed: any = null;
+        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "");
+        try { parsed = JSON.parse(cleaned); } catch {
+          const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
+          if (first >= 0 && last > first) { try { parsed = JSON.parse(cleaned.slice(first, last + 1)); } catch { parsed = null; } }
+        }
+        const discussion = String(parsed?.discussion_feedback || parsed?.discussionFeedback || "").trim();
+        const outcome = String(parsed?.expected_outcome || parsed?.expectedOutcome || "").trim();
+        return { ok: true as const, parsed, discussion, outcome, model: json?.model || "openrouter/free", finishReason: json?.choices?.[0]?.finish_reason || "", contentLength: cleaned.length };
       }
-      const completion = await aiResponse.json();
-      const content = completion?.choices?.[0]?.message?.content;
-      let generated: any;
-      try { generated = typeof content === "string" ? JSON.parse(content) : content; } catch { generated = null; }
-      const discussionFeedback = String(generated?.discussion_feedback || "").trim();
-      const expectedOutcome = String(generated?.expected_outcome || "").trim();
-      if (!discussionFeedback || !expectedOutcome) return response(origin, { error: "The AI returned an incomplete response. Please generate again." }, 502);
-      return response(origin, { discussionFeedback, expectedOutcome, model: completion?.model || "openrouter/free" });
+      let attempt = await requestCoaching(true);
+      if (!attempt.ok) {
+        if (attempt.status === 401) return response(origin, { error: "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." }, 502);
+        if (attempt.status === 429) return response(origin, { error: "The free AI request limit has been reached. Please try again later." }, 429);
+        return response(origin, { error: "OpenRouter could not generate feedback right now. Please try again shortly." }, 502);
+      }
+      if (!attempt.discussion || !attempt.outcome) {
+        console.warn("OpenRouter returned incomplete coaching JSON; retrying with compatibility mode.", { model: attempt.model, finishReason: attempt.finishReason, contentLength: attempt.contentLength });
+        attempt = await requestCoaching(false);
+      }
+      if (!attempt.ok) {
+        if (attempt.status === 401) return response(origin, { error: "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." }, 502);
+        if (attempt.status === 429) return response(origin, { error: "The free AI request limit has been reached. Please try again later." }, 429);
+        return response(origin, { error: "OpenRouter could not generate feedback right now. Please try again shortly." }, 502);
+      }
+      if (!attempt.discussion || !attempt.outcome) {
+        console.error("OpenRouter coaching response remained incomplete after retry.", { model: attempt.model, finishReason: attempt.finishReason, contentLength: attempt.contentLength });
+        return response(origin, { error: "The AI provider returned incomplete coaching text twice. Please retry in a moment; no coaching data was saved." }, 502);
+      }
+      return response(origin, { discussionFeedback: attempt.discussion, expectedOutcome: attempt.outcome, model: attempt.model });
     }
 
     if (action === "me") return response(origin, { user: cleanUser(user), salt: user.password_salt });
