@@ -18,6 +18,7 @@ const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","
 const ALLOWED_ORIGINS = new Set([
   "https://kanako-progress-hub.vercel.app",
   "https://kanako-progress-hub-vapepokemon143-8805.vercel.app",
+  "https://kanako-progress-hub-git-feature-back-ff5521-vapepokemon143-8805.vercel.app",
   "http://localhost:8000", "http://127.0.0.1:8000"
 ]);
 
