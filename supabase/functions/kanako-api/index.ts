@@ -1,10 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3@3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3";
 
 const URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY")!;
 const DB = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const BUCKET = "kanako-workspace-files";
+const B2_KEY_ID = Deno.env.get("B2_KEY_ID") || "";
+const B2_APPLICATION_KEY = Deno.env.get("B2_APPLICATION_KEY") || "";
+const B2_BUCKET_NAME = Deno.env.get("B2_BUCKET_NAME") || "";
+const B2_S3_ENDPOINT = Deno.env.get("B2_S3_ENDPOINT") || "";
+const B2_REGION = B2_S3_ENDPOINT.match(/s3[.]([a-z0-9-]+)[.]backblazeb2[.]com/i)?.[1] || "us-east-005";
+const B2_READY = !!(B2_KEY_ID && B2_APPLICATION_KEY && B2_BUCKET_NAME && B2_S3_ENDPOINT);
+const B2 = B2_READY ? new S3Client({ region: B2_REGION, endpoint: B2_S3_ENDPOINT.startsWith("http") ? B2_S3_ENDPOINT : "https://" + B2_S3_ENDPOINT, forcePathStyle: true, credentials: { accessKeyId: B2_KEY_ID, secretAccessKey: B2_APPLICATION_KEY } }) : null;
 const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","files","feature_ideas"]);
 const ALLOWED_ORIGINS = new Set([
   "https://kanako-progress-hub.vercel.app",
@@ -91,8 +100,11 @@ async function deleteRecords(rows: any[]) {
     if (error) throw error;
     const { data: frows } = await DB.from("workspace_files").select("storage_path").eq("record_key", String(r.record_key));
     if (frows?.length) {
-      const paths = frows.map((x: any) => x.storage_path);
-      await DB.storage.from(BUCKET).remove(paths);
+      const paths = frows.map((x: any) => String(x.storage_path));
+      const b2Paths = paths.filter((p: string) => p.startsWith("b2/")).map((p: string) => p.slice(3));
+      const legacyPaths = paths.filter((p: string) => !p.startsWith("b2/"));
+      if (B2 && b2Paths.length) await Promise.all(b2Paths.map((Key: string) => B2.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key }))));
+      if (legacyPaths.length) await DB.storage.from(BUCKET).remove(legacyPaths);
       await DB.from("workspace_files").delete().eq("record_key", String(r.record_key));
     }
   }
@@ -246,6 +258,35 @@ async function handler(req: Request) {
       await deleteRecords(deletes);
       return response(origin, { ok: true, upserted: upsert.length, deleted: deletes.length });
     }
+    if (action === "file-upload-url") {
+      if (!B2) return response(origin, { useLegacy: true });
+      const recordKey = String(body.recordKey || ""), kind = String(body.kind || ""), fileName = String(body.fileName || "");
+      const size = Number(body.size || 0), contentType = String(body.contentType || (kind === "mp4" ? "video/mp4" : "application/pdf"));
+      if (!/^[a-zA-Z0-9_-]{3,100}$/.test(recordKey) || !["pdf","mp4","auditpdf"].includes(kind)) return response(origin, { error: "Invalid file reference." }, 400);
+      const maxBytes = kind === "mp4" ? 100 * 1024 * 1024 : 45 * 1024 * 1024;
+      if (!Number.isFinite(size) || size <= 0 || size > maxBytes) return response(origin, { error: kind === "mp4" ? "Files must be 100 MB or smaller." : "Files must be 45 MB or smaller." }, 413);
+      if (!fileName || fileName.length > 255) return response(origin, { error: "Invalid file name." }, 400);
+      if (kind === "mp4" && !["video/mp4","application/octet-stream"].includes(contentType)) return response(origin, { error: "Only MP4 recordings are supported." }, 415);
+      if (kind !== "mp4" && contentType !== "application/pdf" && !fileName.toLowerCase().endsWith(".pdf")) return response(origin, { error: "Only PDF audit files are supported." }, 415);
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || (kind === "mp4" ? "recording.mp4" : "audit.pdf");
+      const path = "b2/" + recordKey + "/" + kind + "-" + safeName;
+      const uploadUrl = await getSignedUrl(B2, new PutObjectCommand({ Bucket: B2_BUCKET_NAME, Key: path.slice(3), ContentType: contentType }), { expiresIn: 600 });
+      return response(origin, { uploadUrl, path, contentType, expiresIn: 600 });
+    }
+    if (action === "file-upload-complete") {
+      if (!B2) return response(origin, { error: "Backblaze storage is not configured yet." }, 503);
+      const recordKey = String(body.recordKey || ""), kind = String(body.kind || ""), path = String(body.path || "");
+      const fileName = String(body.fileName || ""), size = Number(body.size || 0);
+      const contentType = String(body.contentType || (kind === "mp4" ? "video/mp4" : "application/pdf"));
+      if (!/^[a-zA-Z0-9_-]{3,100}$/.test(recordKey) || !["pdf","mp4","auditpdf"].includes(kind) || !path.startsWith("b2/" + recordKey + "/" + kind + "-") || path.includes("..")) return response(origin, { error: "Invalid file reference." }, 400);
+      const maxBytes = kind === "mp4" ? 100 * 1024 * 1024 : 45 * 1024 * 1024;
+      if (!Number.isFinite(size) || size <= 0 || size > maxBytes) return response(origin, { error: "File size is invalid." }, 413);
+      const head = await B2.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME, Key: path.slice(3) }));
+      if (Number(head.ContentLength || 0) !== size) return response(origin, { error: "Uploaded file size verification failed." }, 400);
+      const { error: metadataError } = await DB.from("workspace_files").upsert({ record_type: kind, record_key: recordKey, storage_path: path, file_name: fileName, mime_type: contentType, size_bytes: size, metadata: { storageProvider: "backblaze-b2" }, created_by: user.id }, { onConflict: "storage_path" });
+      if (metadataError) throw metadataError;
+      return response(origin, { path, fileName, size, contentType });
+    }
     if (action === "file-upload") {
       if (!uploadFile) return response(origin, { error: "No file was attached." }, 400);
       const recordKey = String(body.recordKey || ""), kind = String(body.kind || "");
@@ -275,6 +316,11 @@ if (uploadFile.size <= 0 || uploadFile.size > maxBytes) {
     if (action === "file-url") {
       const path = String(body.path || "");
       if (!path || path.length > 500 || path.startsWith("/") || path.includes("..")) return response(origin, { error: "Invalid file path." }, 400);
+      if (path.startsWith("b2/")) {
+        if (!B2) return response(origin, { error: "Backblaze storage is not configured yet." }, 503);
+        const url = await getSignedUrl(B2, new GetObjectCommand({ Bucket: B2_BUCKET_NAME, Key: path.slice(3) }), { expiresIn: 600 });
+        return response(origin, { url });
+      }
       const { data, error } = await DB.storage.from(BUCKET).createSignedUrl(path, 600);
       if (error) throw error;
       return response(origin, { url: data.signedUrl });
