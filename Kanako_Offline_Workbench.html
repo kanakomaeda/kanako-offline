@@ -311,7 +311,7 @@ const legacyAuthUsers=loadAuthUsers(); let data=loadData(), view='dashboard', mo
 let authSubmissionInProgress=false, deviceBindingExempt=false, deviceKeyPairPromise=null;
 // Bind authentication controls before the rest of the app initializes, so a later startup error cannot leave Sign In inert.
 $('#authForm').addEventListener('submit',handleAuthSubmit);
-$('#authUsername')?.addEventListener('input',()=>$('#requestUnlockBtn')?.classList.add('hidden'));
+document.addEventListener('input',e=>{if(e.target?.id==='authUsername')$('#requestUnlockBtn')?.classList.add('hidden')});
 $('#requestUnlockBtn')?.addEventListener('click',async()=>{const username=String($('#authUsername')?.value||'').trim().toLowerCase();if(!username){showAuthMessage('Enter your username first, then request an unlock.');return}const btn=$('#requestUnlockBtn');btn.disabled=true;try{const result=await cloudRequest('unlock-request',{username},{auth:false});showAuthMessage(result.message||'If the account is locked, the request has been sent to the Superuser.')}catch(err){showAuthMessage(err.message||'Could not submit the unlock request.')}finally{btn.disabled=false}});
 $('#authSubmit').addEventListener('click',e=>{if(!$('#authForm').checkValidity())return;e.preventDefault();void handleAuthSubmit(e)});
 function clone(v){return JSON.parse(JSON.stringify(v))}function uuid(){return crypto.randomUUID?crypto.randomUUID():'offline-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)}
