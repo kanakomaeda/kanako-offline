@@ -305,6 +305,10 @@ const config={
 };
 const viewTitles={footprints:"Footprint",dashboard:'Dashboard',trainees:'Onboarding Trainees',audits:'QA Audits',coaching:'Coaching',reports:'Weekly Reports',files:'File Library',ideas:'Feature Ideas',tutorial:'How It Works',users:'User Management',logs:'System Logs'};
 const legacyAuthUsers=loadAuthUsers(); let data=loadData(), view='dashboard', modal=null, authUsers=[], currentUser=null, cloudToken=localStorage.getItem(CLOUD_TOKEN_KEY)||'', cloudReady=false, cloudSyncStatus='offline', cloudLastSyncAt='', cloudSyncTimer=null, cloudPollTimer=null, cloudSyncRunning=false, cloudSyncAgain=false, cloudBaseline={}, cloudSyncDetail='';
+let authSubmissionInProgress=false;
+// Bind authentication controls before the rest of the app initializes, so a later startup error cannot leave Sign In inert.
+$('#authForm').addEventListener('submit',handleAuthSubmit);
+$('#authSubmit').addEventListener('click',e=>{if(!$('#authForm').checkValidity())return;e.preventDefault();void handleAuthSubmit(e)});
 function clone(v){return JSON.parse(JSON.stringify(v))}function uuid(){return crypto.randomUUID?crypto.randomUUID():'offline-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)}
 
 
@@ -470,7 +474,7 @@ async function renderAuthScreen(message=''){
   $('#authForm').dataset.mode=setup?'setup':'login';$('#authSubmit').textContent=setup?'Create Superuser account':'Sign in';$('#authFootnote').textContent='Shared data and files are stored securely in the Kanako cloud workspace. Your session is valid for up to 7 days.';if(message)showAuthMessage(message);
 }
 async function handleAuthSubmit(e){
- e.preventDefault();const mode=$('#authForm').dataset.mode;$('#authMessage').classList.add('hidden');$('#authSubmit').disabled=true;
+ e.preventDefault();if(authSubmissionInProgress)return;authSubmissionInProgress=true;const mode=$('#authForm').dataset.mode;$('#authMessage').classList.add('hidden');$('#authSubmit').disabled=true;
  try{
   if(mode==='setup'){
    const displayName=$('#setupDisplayName').value.trim(),username=$('#setupUsername').value.trim().toLowerCase(),password=$('#setupPassword').value,confirmPassword=$('#setupConfirmPassword').value,setupCode=$('#setupCode').value.trim();
@@ -481,10 +485,8 @@ async function handleAuthSubmit(e){
   const username=$('#authUsername').value.trim().toLowerCase(),password=$('#authPassword').value;if(!username||!password)throw new Error('Enter your username and password.');
   const challenge=await cloudRequest('login-challenge',{username},{auth:false});if(!challenge.salt)throw new Error('Username or password is incorrect, or the account is disabled.');
   const passwordHash=await hashPassword(password,challenge.salt),result=await cloudRequest('login',{username,passwordHash},{auth:false});cloudToken=result.token;localStorage.setItem(CLOUD_TOKEN_KEY,cloudToken);await enterApp(result.user);
- }catch(err){showAuthMessage(err.message||'Could not sign in. Please try again.')}finally{$('#authSubmit').disabled=false}
+ }catch(err){showAuthMessage(err.message||'Could not sign in. Please try again.')}finally{$('#authSubmit').disabled=false;authSubmissionInProgress=false}
 }
-// Attach the authentication handler immediately after its definition, before optional app initialization.
-$('#authForm').addEventListener('submit',handleAuthSubmit);
 function onboardingCompletionKey(){return 'kanako-how-it-works-completed-v1:'+String(currentUser?.username||currentUser?.id||'unknown').toLowerCase()}function showRequiredOnboardingVideo(){const backdrop=$('#onboardingVideoBackdrop'),video=$('#requiredOnboardingVideo'),btn=$('#finishOnboardingVideo');if(!backdrop||!video||!btn)return;let completed=false;try{completed=localStorage.getItem(onboardingCompletionKey())==='true'}catch(_){}if(completed)return;video.pause();video.currentTime=0;btn.disabled=true;btn.textContent='Finish video to continue';$('#onboardingVideoStatus').textContent='Watch the video until it finishes to unlock Kanako.';backdrop.classList.remove('hidden');document.body.style.overflow='hidden'}function completeRequiredOnboardingVideo(){const backdrop=$('#onboardingVideoBackdrop'),video=$('#requiredOnboardingVideo');try{localStorage.setItem(onboardingCompletionKey(),'true')}catch(_){toast('Could not save completion','Browser storage is unavailable. Keep this tab open and contact the Superuser.',true);return}backdrop.classList.add('hidden');document.body.style.overflow='';video.pause();toast('Orientation completed','You can revisit the walkthrough anytime from How It Works.')}document.addEventListener('DOMContentLoaded',()=>{const onboardingVideo=$('#requiredOnboardingVideo'),finishOnboardingVideo=$('#finishOnboardingVideo');if(!onboardingVideo||!finishOnboardingVideo)return;onboardingVideo.addEventListener('ended',()=>{const btn=$('#finishOnboardingVideo');btn.disabled=false;btn.textContent='Continue to Kanako';$('#onboardingVideoStatus').textContent='Video completed. Select Continue to Kanako to enter the workspace.'});finishOnboardingVideo.addEventListener('click',()=>{if(!onboardingVideo.ended)return;completeRequiredOnboardingVideo()})});
 async function enterApp(user){
  currentUser=user;authUsers=[];$('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');$('#sessionRoleChip').textContent=isSuperuser()?'SUPERUSER':'ADMIN';$('#userNav').classList.toggle('hidden',!isSuperuser());$('#logsNav').classList.toggle('hidden',!isSuperuser());$('#footprintsNav')?.classList.toggle('hidden',!canViewFootprints());$('#importBtn').classList.toggle('hidden',!isSuperuser());$('#clearSystemLogs').classList.toggle('hidden',!isSuperuser());$('#exportBtn').classList.toggle('hidden',!isSuperuser());$('#dashboardView h1').textContent='Good day, '+(user.displayName||user.username||'Trainer')+'.';
