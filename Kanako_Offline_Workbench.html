@@ -80,15 +80,16 @@ body[data-theme="dark"]{--ink:#e7edf8;--muted:#9baac0;--line:#2a3850;--surface:#
 
 /* Prevent any nested vertical scroll box from clipping the final audit rows. */
 #logsView .audit-history-wrap,#footprintsView .audit-history-wrap{overflow:visible!important}
-/* Compact audit tables to fit the panel width instead of forcing horizontal overflow. */
-#footprintsView .footprint-table,#logsView #systemLogsTable .data-table{width:25%!important;min-width:0!important;max-width:25%!important;table-layout:fixed!important}
-#footprintsView .audit-history-wrap,#logsView .audit-history-wrap{width:100%;max-width:100%;overflow-x:hidden!important;box-sizing:border-box}
-#footprintsView .footprint-table th,#footprintsView .footprint-table td,#logsView #systemLogsTable .data-table th,#logsView #systemLogsTable .data-table td{min-width:0!important;white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box;padding:1px!important;font-size:3px!important;line-height:1.1}
+/* Keep audit panels from clipping their footer/empty-state content; fit tables to the available panel width. */
+#logsView .panel,#footprintsView .panel{overflow:visible!important}
+#footprintsView .footprint-table,#logsView #systemLogsTable .data-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important}
+#footprintsView .audit-history-wrap,#logsView .audit-history-wrap{width:100%;max-width:100%;overflow-x:auto!important;overflow-y:visible!important;box-sizing:border-box}
+#footprintsView .footprint-table th,#footprintsView .footprint-table td,#logsView #systemLogsTable .data-table th,#logsView #systemLogsTable .data-table td{min-width:0!important;white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box;padding:6px!important;font-size:8px!important;line-height:1.35}
 #footprintsView .footprint-table th:nth-child(1){width:18%}#footprintsView .footprint-table th:nth-child(2){width:17%}#footprintsView .footprint-table th:nth-child(3){width:12%}#footprintsView .footprint-table th:nth-child(4){width:18%}#footprintsView .footprint-table th:nth-child(5){width:35%}
 #logsView #systemLogsTable th:nth-child(1){width:16%}#logsView #systemLogsTable th:nth-child(2){width:9%}#logsView #systemLogsTable th:nth-child(3){width:23%}#logsView #systemLogsTable th:nth-child(4){width:15%}#logsView #systemLogsTable th:nth-child(5){width:12%}#logsView #systemLogsTable th:nth-child(6){width:25%}
 #footprintsView .footprint-table details,#logsView #systemLogsTable details{max-width:100%;min-width:0}
 #footprintsView .footprint-table pre,#logsView #systemLogsTable pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
-@media(max-width:620px){#footprintsView .footprint-table th,#footprintsView .footprint-table td,#logsView #systemLogsTable .data-table th,#logsView #systemLogsTable .data-table td{padding:1px!important;font-size:3px!important}#footprintsView .footprint-table th:nth-child(1){width:20%}#footprintsView .footprint-table th:nth-child(2){width:17%}#footprintsView .footprint-table th:nth-child(3){width:12%}#footprintsView .footprint-table th:nth-child(4){width:18%}#footprintsView .footprint-table th:nth-child(5){width:33%}}
+@media(max-width:620px){#footprintsView .footprint-table th,#footprintsView .footprint-table td,#logsView #systemLogsTable .data-table th,#logsView #systemLogsTable .data-table td{padding:4px!important;font-size:7px!important}}
 /* Final layout fix: let the Footprint and System Logs pages grow to the full content height. */
 html,body{height:auto;min-height:100%;overflow-y:auto!important}
 .app-shell,.main{height:auto!important;min-height:100vh;overflow:visible!important}
