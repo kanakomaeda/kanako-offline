@@ -408,7 +408,14 @@ function cloudRowsToData(rows){const result=clone(defaults);for(const row of row
 function cloudMaps(source){const out={};for(const type of CLOUD_COLLECTIONS){out[type]=Object.create(null);for(const item of source[type]||[])if(item&&item.id)out[type][String(item.id)]=item}return out}
 function sameRecord(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function scheduleCloudSync(){if(!cloudReady||!currentUser)return;if(cloudSyncTimer)clearTimeout(cloudSyncTimer);cloudSyncStatus='pending';renderSync();cloudSyncTimer=setTimeout(()=>syncCloudNow().catch(()=>{}),1200)}
-async function uploadCloudFile(recordKey,kind,file){const form=new FormData();form.append('recordKey',String(recordKey));form.append('kind',kind);form.append('file',file,file.name||('evidence.'+(kind==='mp4'?'mp4':'pdf')));return await cloudRequest('file-upload',{}, {formData:form})}
+async function uploadCloudFile(recordKey,kind,file){
+ const contentType=file.type||(kind==='mp4'?'video/mp4':'application/pdf');
+ const init=await cloudRequest('file-upload-url',{recordKey:String(recordKey),kind,fileName:file.name||('evidence.'+(kind==='mp4'?'mp4':'pdf')),size:file.size,contentType});
+ if(init?.useLegacy){const form=new FormData();form.append('recordKey',String(recordKey));form.append('kind',kind);form.append('file',file,file.name||('evidence.'+(kind==='mp4'?'mp4':'pdf')));return await cloudRequest('file-upload',{}, {formData:form})}
+ const sent=await fetch(init.uploadUrl,{method:'PUT',headers:{'Content-Type':contentType},body:file});
+ if(!sent.ok)throw new Error('Backblaze upload failed ('+sent.status+'). Check the bucket CORS rule and try again.');
+ return await cloudRequest('file-upload-complete',{recordKey:String(recordKey),kind,path:init.path,fileName:file.name,size:file.size,contentType});
+}
 async function uploadPendingCloudFiles(){
  let changed=false,failed=0;cloudSyncDetail='Preparing pending attachments…';renderSync();
  for(const f of (data.files||[]))for(const part of [{key:'pdf_file_id',path:'pdf_storage_path',kind:'pdf',name:'pdf_original_name',type:'pdf_content_type'},{key:'mp4_file_id',path:'mp4_storage_path',kind:'mp4',name:'mp4_original_name',type:'mp4_content_type'}]){
