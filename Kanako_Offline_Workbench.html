@@ -97,6 +97,45 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
 #logsView>.panel,#footprintsView>.panel{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important}
 #logsView .audit-history-wrap,#footprintsView .audit-history-wrap{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important;padding-bottom:64px!important;margin-bottom:40px!important}
 #logsView .data-table tbody tr:last-child td,#footprintsView .data-table tbody tr:last-child td{padding-bottom:48px!important}
+
+/* Footprint and System Logs: keep empty states in normal document flow.
+   These rules must stay inside the document's <style> element. */
+#footprintsView,
+#footprintsView > .panel,
+#footprintsView .panel-heading,
+#footprintsView .filter-bar,
+#footprintsView .audit-history-wrap,
+#footprintsView #footprintsTable,
+#logsView,
+#logsView > .panel,
+#logsView .audit-history-wrap,
+#logsView #systemLogsTable {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  contain: none !important;
+  clip-path: none !important;
+}
+#footprintsView .footprint-table,
+#logsView #systemLogsTable .data-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: auto !important;
+}
+#footprintsView .empty-state,
+#logsView #systemLogsTable .empty-state {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  padding: 34px 20px 48px !important;
+  box-sizing: border-box !important;
+}
 </style>
 </head>
 <body data-theme="light">
@@ -886,7 +925,3 @@ $('#todayChip').textContent=new Date().toLocaleDateString('en-US',{weekday:'shor
 </script>
 </body>
 </html>
-/* Definitive fix: overflow-x:auto combined with overflow-y:visible computes to a vertical scroll container and clips the empty state. */
-#footprintsView,#footprintsView>.panel,#footprintsView .panel-heading,#footprintsView .filter-bar,#footprintsView .audit-history-wrap,#footprintsView #footprintsTable,#logsView,#logsView>.panel,#logsView .audit-history-wrap,#logsView #systemLogsTable{height:auto!important;max-height:none!important;min-height:0!important;overflow:visible!important;contain:initial!important;clip-path:none!important}
-#footprintsView .footprint-table,#logsView #systemLogsTable .data-table{width:100%!important;min-width:0!important;max-width:100%!important}
-#footprintsView .empty-state,#logsView #systemLogsTable .empty-state{height:auto!important;max-height:none!important;overflow:visible!important;white-space:normal!important;padding:34px 20px 48px!important;box-sizing:border-box}
