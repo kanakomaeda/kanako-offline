@@ -196,6 +196,14 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
 
 /* User-controlled sidebar visibility on desktop; mobile keeps its slide-out menu behavior. */
 @media(min-width:941px){#mobileMenu{display:block;flex:0 0 auto}.app-shell.nav-collapsed .sidebar{transform:translateX(-100%);visibility:hidden}.app-shell.nav-collapsed .main{margin-left:0}.sidebar{transition:transform .2s,visibility .2s}.main{transition:margin-left .2s}}
+
+/* Keep Footprint and System Logs readable when the sidebar reduces workspace width. */
+#logsView,#footprintsView{width:100%;min-width:0}
+#logsView .history-meta,#footprintsView .history-meta{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+#logsView .history-meta>div,#footprintsView .history-meta>div{min-width:0}
+#logsView .history-card,#footprintsView .history-card{min-width:0;max-width:100%}
+#logsView .history-card pre,#footprintsView .history-card pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+
 </style>
 </head>
 <body data-theme="light">
