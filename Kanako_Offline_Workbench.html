@@ -886,3 +886,7 @@ $('#todayChip').textContent=new Date().toLocaleDateString('en-US',{weekday:'shor
 </script>
 </body>
 </html>
+/* Definitive fix: overflow-x:auto combined with overflow-y:visible computes to a vertical scroll container and clips the empty state. */
+#footprintsView,#footprintsView>.panel,#footprintsView .panel-heading,#footprintsView .filter-bar,#footprintsView .audit-history-wrap,#footprintsView #footprintsTable,#logsView,#logsView>.panel,#logsView .audit-history-wrap,#logsView #systemLogsTable{height:auto!important;max-height:none!important;min-height:0!important;overflow:visible!important;contain:initial!important;clip-path:none!important}
+#footprintsView .footprint-table,#logsView #systemLogsTable .data-table{width:100%!important;min-width:0!important;max-width:100%!important}
+#footprintsView .empty-state,#logsView #systemLogsTable .empty-state{height:auto!important;max-height:none!important;overflow:visible!important;white-space:normal!important;padding:34px 20px 48px!important;box-sizing:border-box}
