@@ -5,10 +5,11 @@ const URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY")!;
 const DB = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const BUCKET = "kanako-workspace-files";
-const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","files","feature_ideas"]);
+const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","files","feature_ideas","system_logs"]);
 const ALLOWED_ORIGINS = new Set([
   "https://kanako-progress-hub.vercel.app",
   "https://kanako-progress-hub-vapepokemon143-8805.vercel.app",
+  "https://kanako-progress-hub-git-feature-supe-b08eaf-vapepokemon143-8805.vercel.app",
   "http://localhost:8000", "http://127.0.0.1:8000"
 ]);
 
@@ -235,13 +236,36 @@ async function handler(req: Request) {
       await DB.from("workspace_sessions").delete().eq("user_id", target.id);
       return response(origin, { ok: true });
     }
+    if (action === "system-log-add") {
+      const level = ["error","warning"].includes(String(body.level)) ? String(body.level) : "error";
+      const message = String(body.message || "Unknown application error").slice(0, 500);
+      const details = String(body.details || "").slice(0, 3000);
+      const logId = crypto.randomUUID();
+      const payload = { id: logId, level, message, details, source: String(body.source || "app").slice(0, 80), route: String(body.route || "").slice(0, 160), occurredAt: String(body.occurredAt || new Date().toISOString()).slice(0, 40), userId: user.id, username: user.username, displayName: user.display_name };
+      const { error } = await DB.from("workspace_records").insert({ record_type: "system_logs", record_key: logId, payload, created_by: user.id, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      return response(origin, { ok: true, id: logId }, 201);
+    }
+    if (action === "system-logs-list") {
+      if (user.role !== "superuser") return response(origin, { error: "Only the Superuser can view system logs." }, 403);
+      const { data, error } = await DB.from("workspace_records").select("record_key,payload,updated_at").eq("record_type", "system_logs").order("updated_at", { ascending: false }).limit(500);
+      if (error) throw error;
+      return response(origin, { logs: (data || []).map(row => ({ ...(row.payload || {}), id: row.record_key, updatedAt: row.updated_at })) });
+    }
+    if (action === "system-logs-clear") {
+      if (user.role !== "superuser") return response(origin, { error: "Only the Superuser can clear system logs." }, 403);
+      const { error } = await DB.from("workspace_records").delete().eq("record_type", "system_logs");
+      if (error) throw error;
+      return response(origin, { ok: true });
+    }
     if (action === "data-pull") {
       const records = await listWorkspaceRecords();
-      return response(origin, { records });
+      return response(origin, { records: user.role === "superuser" ? records : records.filter((r: any) => r.record_type !== "system_logs") });
     }
     if (action === "data-sync") {
       const upsert = Array.isArray(body.upsert) ? body.upsert : [];
       const deletes = Array.isArray(body.deletes) ? body.deletes : [];
+      if (upsert.some((r: any) => String(r?.record_type) === "system_logs") || deletes.some((r: any) => String(r?.record_type) === "system_logs")) return response(origin, { error: "System logs must use the protected log endpoints." }, 403);
       await upsertRecords(upsert, user.id);
       await deleteRecords(deletes);
       return response(origin, { ok: true, upserted: upsert.length, deleted: deletes.length });
