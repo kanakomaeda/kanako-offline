@@ -506,6 +506,17 @@ async function handler(req: Request) {
       if (targetErr) throw targetErr;
       if (!target || target.role !== "admin") return response(origin, { error: "Admin account not found." }, 404);
 
+      const suppliedPassword = typeof body.superuserPassword === "string" ? body.superuserPassword : "";
+      if (!suppliedPassword || suppliedPassword.length > 1024) return response(origin, { error: "Enter your Superuser password to confirm deletion." }, 400);
+      const { data: superuserRecord, error: passwordLookupError } = await DB.from("workspace_app_users")
+        .select("id,role,password_salt,password_hash,active").eq("id", user.id).maybeSingle();
+      if (passwordLookupError) throw passwordLookupError;
+      if (!superuserRecord || superuserRecord.role !== "superuser" || !superuserRecord.active) return response(origin, { error: "Superuser account could not be verified." }, 403);
+      const passwordKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(suppliedPassword), "PBKDF2", false, ["deriveBits"]);
+      const passwordBits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: new TextEncoder().encode(superuserRecord.password_salt), iterations: 120000, hash: "SHA-256" }, passwordKey, 256);
+      const calculatedHash = [...new Uint8Array(passwordBits)].map(x => x.toString(16).padStart(2, "0")).join("");
+      if (calculatedHash !== String(superuserRecord.password_hash || "").toLowerCase()) return response(origin, { error: "Incorrect Superuser password. The Admin account was not deleted." }, 403);
+
       const { error: auditError } = await DB.from("workspace_audit_footprints").insert({
         actor_id: user.id, actor_username: user.username, actor_display_name: user.display_name, actor_role: user.role,
         action: "deleted", record_type: "admin_account", record_key: target.id,
