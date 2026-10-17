@@ -497,6 +497,31 @@ async function handler(req: Request) {
       if (!active) await DB.from("workspace_sessions").delete().eq("user_id", target.id);
       return response(origin, { ok: true });
     }
+    if (action === "users-delete") {
+      if (user.role !== "superuser") return response(origin, { error: "Only the Superuser can delete Admin accounts." }, 403);
+      const id = String(body.id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return response(origin, { error: "Invalid Admin account identifier." }, 400);
+      const { data: target, error: targetErr } = await DB.from("workspace_app_users")
+        .select("id,username,display_name,role,active,email,created_at").eq("id", id).maybeSingle();
+      if (targetErr) throw targetErr;
+      if (!target || target.role !== "admin") return response(origin, { error: "Admin account not found." }, 404);
+
+      const { error: auditError } = await DB.from("workspace_audit_footprints").insert({
+        actor_id: user.id, actor_username: user.username, actor_display_name: user.display_name, actor_role: user.role,
+        action: "deleted", record_type: "admin_account", record_key: target.id,
+        record_label: (target.display_name || target.username).slice(0, 240),
+        changed_fields: [{ field: "account", before: { username: target.username, email: target.email, role: target.role, active: target.active }, after: null }],
+        before_data: { username: target.username, email: target.email, display_name: target.display_name, role: target.role, active: target.active, created_at: target.created_at },
+        after_data: null
+      });
+      if (auditError) throw auditError;
+
+      const { error: securityError } = await DB.from("workspace_signin_security").delete().eq("username", target.username);
+      if (securityError) throw securityError;
+      const { error: deleteError } = await DB.from("workspace_app_users").delete().eq("id", target.id).eq("role", "admin");
+      if (deleteError) throw deleteError;
+      return response(origin, { ok: true, deleted: true, username: target.username });
+    }
     if (action === "users-reset") {
       if (user.role !== "superuser") return response(origin, { error: "Only the Superuser can reset Admin passwords." }, 403);
       if (!validHashSalt(body)) return response(origin, { error: "Invalid password details." }, 400);
