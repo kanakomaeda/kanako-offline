@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/Kanako_Offline_Workbench.html"
+    }
+  ]
+}
