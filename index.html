@@ -807,7 +807,7 @@ async function generateAiCoachingFeedback(item){
  if(btn){btn.disabled=true;btn.textContent='Generating feedback…'}
  if(status)status.textContent='Analyzing the supplied QA evidence. This may take a few seconds.';
  try{
-  const result=await cloudRequest('ai-coaching-feedback',{coaching:{traineeName:trainee?.full_name||'the VA',sessionDate:$('#fld_session_date')?.value||item?.session_date||'',auditDate:audit?.audit_date||'',auditScore:audit&&audit.score!=null?String(audit.score)+'/'+String(audit.max_score||100):'',strengths,areasForImprovement,auditNotes:[audit?.notes||'',audit?.gaps||''].filter(Boolean).join('\n'),currentSmartPlan:readField('trainee_smart_plan')}});
+  const result=await cloudRequest('ai-coaching-feedback',{coaching:{traineeName:trainee?.preferred_name||trainee?.full_name||'the VA',sessionDate:$('#fld_session_date')?.value||item?.session_date||'',auditDate:audit?.audit_date||'',auditScore:audit&&audit.score!=null?String(audit.score)+'/'+String(audit.max_score||100):'',strengths,areasForImprovement,auditNotes:[audit?.notes||'',audit?.gaps||''].filter(Boolean).join('\n'),currentSmartPlan:readField('trainee_smart_plan')}});
   const discussion=$('#fld_discussion_notes'),outcome=$('#fld_outcome');
   if(discussion)discussion.value=result.discussionFeedback;
   if(outcome)outcome.value=result.expectedOutcome;
