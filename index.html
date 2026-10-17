@@ -590,8 +590,8 @@ async function attachDeviceSignature(headers,action,body,formData){if(deviceBind
 async function cloudRequest(action,payload={},opts={}){
  const headers={'apikey':CLOUD_KEY};if(cloudToken&&opts.auth!==false)headers.Authorization='Bearer '+cloudToken;
  let body;if(opts.formData){body=opts.formData;body.set('action',action);body.set('deviceId',getDeviceId());body.set('deviceLabel',getDeviceLabel());await attachDeviceSignature(headers,action,body,body)}else{headers['Content-Type']='application/json';body=JSON.stringify({action,deviceId:getDeviceId(),deviceLabel:getDeviceLabel(),...payload});await attachDeviceSignature(headers,action,body,null)}
- const res=await fetch(CLOUD_API,{method:'POST',headers,body});let result={};try{result=await res.json()}catch(_){}
- if(!res.ok){if(res.status===401&&cloudToken&&opts.auth!==false&&action!=='logout'&&action!=='me'){await logout(true);showAuthMessage('Your account was signed in on another device. Please sign in again.')}const requestError=new Error(result.error||('Cloud request failed ('+res.status+').'));requestError.status=res.status;requestError.data=result;throw requestError}return result;
+ let res;try{res=await fetch(CLOUD_API,{method:'POST',headers,body})}catch(networkError){if(currentUser&&cloudToken&&!['system-log-add','system-logs-list','system-logs-clear'].includes(action))void recordSystemError('cloud-request:'+action,networkError);throw networkError}let result={};try{result=await res.json()}catch(_){}
+ if(!res.ok){const requestError=new Error(result.error||('Cloud request failed ('+res.status+').'));requestError.status=res.status;requestError.data=result;if(currentUser&&cloudToken&&!['system-log-add','system-logs-list','system-logs-clear'].includes(action))void recordSystemError('cloud-request:'+action,requestError);if(res.status===401&&cloudToken&&opts.auth!==false&&action!=='logout'&&action!=='me'){await logout(true);showAuthMessage('Your account was signed in on another device. Please sign in again.')}throw requestError}return result;
 }
 const CLOUD_COLLECTIONS=['trainees','audits','coachings','weekly_reports','files','feature_ideas','trainee_history'];
 function asCloudRows(source){const rows=[];for(const type of CLOUD_COLLECTIONS)for(const rec of (source[type]||[]))if(rec&&rec.id)rows.push({record_type:type,record_key:String(rec.id),payload:rec});return rows}
@@ -737,7 +737,7 @@ async function recordSystemError(source,error,level='error'){
  if(!currentUser||!cloudToken)return;
  const message=String(error?.message||error||'Unknown error').slice(0,500);
  const details=String(error?.stack||'').slice(0,3000);
- try{await cloudRequest('system-log-add',{level,message,details,source:String(source||'app').slice(0,80),route:location.pathname,occurredAt:new Date().toISOString()})}catch(_){}
+ try{await cloudRequest('system-log-add',{level,message,details,source:String(source||'app').slice(0,80),route:location.pathname,occurredAt:new Date().toISOString()})}catch(loggingError){console.error('Kanako system log write failed:',loggingError);const status=$('#systemLogStatus');if(status&&view==='logs')status.textContent='Log write failed: '+String(loggingError?.message||loggingError).slice(0,180)}
 }
 function safeLogText(value){return esc(String(value??'').replace(/(password|token|authorization|secret)\s*[:=]\s*[^\s,;]+/ig,'$1=[redacted]').slice(0,3000))}
 async function loadSystemLogs(){
