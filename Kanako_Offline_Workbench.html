@@ -136,6 +136,63 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
   padding: 34px 20px 48px !important;
   box-sizing: border-box !important;
 }
+
+/* Rebuilt Footprint and System Logs as vertically stacked, readable history cards. */
+.history-page{display:flow-root;min-width:0;padding-bottom:36px}
+.history-page.hidden{display:none!important}
+.history-page .page-heading{align-items:flex-start;gap:18px;margin-bottom:22px}
+.history-page .page-heading>div:first-child{min-width:0;flex:1}
+.history-page .page-heading p{max-width:760px;line-height:1.65;overflow-wrap:anywhere}
+.history-panel{min-width:0;overflow:visible!important;height:auto!important;max-height:none!important}
+.history-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;flex-wrap:wrap}
+.history-panel-heading>div{min-width:0;flex:1}
+.history-panel-heading p{line-height:1.6;overflow-wrap:anywhere}
+.history-tools{padding:0 22px 18px;min-width:0}
+.history-tools .search-box{width:100%;max-width:560px}
+.history-list{display:block;width:100%;min-width:0;height:auto!important;max-height:none!important;overflow:visible!important;padding:0 22px 26px;box-sizing:border-box}
+.history-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:100%;min-width:0}
+.history-card{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;padding:18px;border:1px solid var(--line,#e7edf5);border-radius:12px;background:var(--surface,#fff);overflow:visible;overflow-wrap:anywhere}
+.history-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.history-card-title{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}
+.history-card-title h3{margin:1px 0 0;min-width:0;font-size:14px;line-height:1.55;font-weight:750;color:var(--ink,#1d2a3d);overflow-wrap:anywhere;word-break:normal}
+.history-index{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:28px;height:26px;padding:0 6px;border-radius:7px;background:var(--blue-soft,#eef2ff);color:var(--blue,#3f5fba);font-size:10px;font-weight:800}
+.history-badge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;max-width:45%;padding:5px 9px;border-radius:999px;font-size:10px;line-height:1.35;font-weight:800;white-space:normal;text-align:center;overflow-wrap:anywhere}
+.history-badge-error{background:#fff0f0;color:#b42318}
+.history-badge-warning{background:#fff6df;color:#946200}
+.history-badge-success{background:#e8f7ee;color:#187447}
+.history-badge-neutral{background:var(--blue-soft,#eef2ff);color:var(--blue,#3f5fba)}
+.history-route,.history-record-label{margin:7px 0 0;color:var(--muted,#718096);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.history-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line,#e7edf5)}
+.history-meta>div{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
+.history-meta span,.history-meta small{color:var(--muted,#718096);font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.history-meta strong{display:block;width:100%;color:var(--ink,#1d2a3d);font-size:12px;line-height:1.6;font-weight:650;overflow-wrap:anywhere;word-break:normal}
+.history-details{margin-top:15px;padding-top:12px;border-top:1px solid var(--line,#e7edf5);min-width:0}
+.history-details summary{display:list-item;cursor:pointer;color:var(--blue,#3f5fba);font-size:12px;line-height:1.6;font-weight:750;overflow-wrap:anywhere}
+.history-details pre{max-width:100%;margin:10px 0 0;padding:12px;border-radius:8px;background:var(--surface-soft,#f6f8fb);color:var(--ink,#1d2a3d);font:11px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
+.footprint-diff{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px;min-width:0}
+.footprint-field{min-width:0;padding:12px;border:1px solid var(--line,#e7edf5);border-radius:9px}
+.footprint-field>strong{display:block;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.footprint-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;min-width:0}
+.footprint-values>div{min-width:0}
+.footprint-values small{display:block;margin-bottom:5px;color:var(--muted,#718096);font-size:10px;font-weight:750}
+.footprint-values pre{margin:0;max-width:100%;padding:10px;background:var(--surface-soft,#f6f8fb);border-radius:7px;font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
+.history-no-details{margin:14px 0 0;color:var(--muted,#718096);font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.history-list>.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:150px;height:auto!important;max-height:none!important;padding:30px 20px 34px!important;text-align:center;white-space:normal!important;overflow:visible!important;box-sizing:border-box}
+.history-list>.empty-state strong{font-size:13px;line-height:1.6;color:var(--ink,#1d2a3d);overflow-wrap:anywhere}
+.history-list>.empty-state span{font-size:12px;line-height:1.7;color:var(--muted,#718096);overflow-wrap:anywhere}
+#logsView .panel,#footprintsView .panel{overflow:visible!important}
+@media(max-width:760px){
+ .history-page .page-heading{flex-direction:column}
+ .history-page .page-heading .heading-actions{width:100%;display:flex;flex-wrap:wrap}
+ .history-panel-heading{padding:17px 15px}
+ .history-tools{padding:0 15px 15px}
+ .history-list{padding:0 15px 20px}
+ .history-card{padding:14px}
+ .history-meta{grid-template-columns:minmax(0,1fr);gap:10px}
+ .history-meta>div{display:grid;grid-template-columns:minmax(95px,.65fr) minmax(0,1.35fr);align-items:start;gap:10px}
+ .history-meta strong{font-size:12px}
+ .footprint-values{grid-template-columns:minmax(0,1fr)}
+}
 </style>
 </head>
 <body data-theme="light">
@@ -209,15 +266,15 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
 <div class="backdrop hidden" id="importBackdrop"><section class="modal"><div class="modal-heading"><div><div class="eyebrow">RESTORE DATA</div><h2>Import backup</h2><p>Select a Kanako full-backup JSON file. Version 3 backups can include PDF and MP4 attachments.</p></div><button class="modal-close" id="closeImport">×</button></div><div class="field"><label for="importFile">Backup file</label><input id="importFile" type="file" accept=".json,application/json"></div><div class="modal-footer"><button type="button" class="btn" id="cancelImport">Cancel</button><button type="button" class="btn btn-primary" id="confirmImport">Restore backup</button></div></section></div>
 <div class="backdrop hidden" id="passwordBackdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="passwordTitle"><div class="modal-heading"><div><div class="eyebrow">ACCOUNT SECURITY</div><h2 id="passwordTitle">Change password</h2><p>Choose a new password for your account.</p></div><button class="modal-close" id="closePassword" type="button" aria-label="Close dialog">×</button></div><div id="passwordMessage" class="form-message hidden"></div><form id="passwordForm"><div class="field"><label for="currentPassword">Current password *</label><input id="currentPassword" type="password" required autocomplete="current-password"></div><div class="field"><label for="newPassword">New password *</label><input id="newPassword" type="password" required minlength="10" autocomplete="new-password"></div><div class="field"><label for="confirmNewPassword">Confirm new password *</label><input id="confirmNewPassword" type="password" required minlength="10" autocomplete="new-password"></div><div class="modal-footer"><button type="button" class="btn btn-outline" id="cancelPassword">Cancel</button><button type="submit" class="btn btn-primary">Update password</button></div></form></section></div>
 <div class="backdrop hidden" id="adminResetBackdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="adminResetTitle"><div class="modal-heading"><div><div class="eyebrow">ADMIN ACCOUNT</div><h2 id="adminResetTitle">Reset Admin password</h2><p id="adminResetDescription">Set a new password for this Admin account.</p></div><button class="modal-close" id="closeAdminReset" type="button" aria-label="Close dialog">×</button></div><div id="adminResetMessage" class="form-message hidden"></div><form id="adminResetForm"><input type="hidden" id="adminResetUserId"><div class="field"><label for="adminResetPassword">New password *</label><input id="adminResetPassword" type="password" required minlength="10" autocomplete="new-password"></div><div class="field"><label for="adminResetConfirm">Confirm new password *</label><input id="adminResetConfirm" type="password" required minlength="10" autocomplete="new-password"></div><div class="modal-footer"><button type="button" class="btn btn-outline" id="cancelAdminReset">Cancel</button><button type="submit" class="btn btn-primary">Save new password</button></div></form></section></div>
-<section class="page hidden" id="logsView">
- <div class="page-heading"><div><div class="eyebrow">ADMIN &amp; SUPERUSER</div><h1>System Logs</h1><p>Realtime application errors, sync failures, and warnings reported by signed-in Kanako users. Latest 500 entries are retained.</p></div><div class="heading-actions"><button class="btn btn-outline" id="refreshSystemLogs">↻ Refresh</button><button class="btn btn-danger" id="clearSystemLogs">Clear logs</button></div></div>
- <section class="panel"><div class="panel-heading"><div><h2>Live error feed</h2><p id="systemLogStatus" aria-live="polite">Waiting for log data…</p></div><span class="result-count" id="systemLogTotal">0 entries</span></div><div id="systemLogsTable" class="table-wrap audit-history-wrap"><div class="empty-state">Loading system logs…</div></div></section>
+<section class="page hidden history-page" id="logsView">
+ <div class="page-heading"><div><div class="eyebrow">ADMIN &amp; SUPERUSER</div><h1>System Logs</h1><p>Review application errors, sync failures, and warnings reported by signed-in Kanako users. Up to 500 recent entries are retained.</p></div><div class="heading-actions"><button class="btn btn-outline" id="refreshSystemLogs">↻ Refresh</button><button class="btn btn-danger" id="clearSystemLogs">Clear logs</button></div></div>
+ <section class="panel history-panel"><div class="panel-heading history-panel-heading"><div><h2>Live error feed</h2><p id="systemLogStatus" aria-live="polite">Waiting for log data…</p></div><span class="result-count" id="systemLogTotal">0 entries</span></div><div id="systemLogsTable" class="history-list"><div class="empty-state"><strong>Loading system logs…</strong><span>Recent errors and warnings will appear here.</span></div></div></section>
 </section>
-<section class="page hidden" id="footprintsView">
- <div class="page-heading"><div><div class="eyebrow">AUDIT TRAIL</div><h1>Footprint</h1><p>Review who changed shared records, what changed, and when. Times are shown in Philippine Time (PHT).</p></div><div class="heading-actions"><button class="btn btn-outline" id="refreshFootprints">↻ Refresh</button></div></div>
- <section class="panel"><div class="panel-heading"><div><h2>Workspace change history</h2><p id="footprintStatus" aria-live="polite">Loading change history…</p></div><span class="result-count" id="footprintTotal">0 changes</span></div>
- <div class="filter-bar" style="padding:14px 16px 0"><div class="search-box"><span>⌕</span><input id="footprintSearch" placeholder="Search user, record, action, or changed field…"></div></div>
- <div id="footprintsTable" class="table-wrap audit-history-wrap"><div class="empty-state">Loading change history…</div></div></section>
+<section class="page hidden history-page" id="footprintsView">
+ <div class="page-heading"><div><div class="eyebrow">AUDIT TRAIL</div><h1>Footprint</h1><p>Review who changed shared records, what changed, and when. All timestamps are shown in Philippine Time (PHT).</p></div><div class="heading-actions"><button class="btn btn-outline" id="refreshFootprints">↻ Refresh</button></div></div>
+ <section class="panel history-panel"><div class="panel-heading history-panel-heading"><div><h2>Workspace change history</h2><p id="footprintStatus" aria-live="polite">Loading change history…</p></div><span class="result-count" id="footprintTotal">0 changes</span></div>
+ <div class="history-tools"><div class="search-box"><span>⌕</span><input id="footprintSearch" placeholder="Search by user, record, action, or changed field…" aria-label="Search workspace change history"></div></div>
+ <div id="footprintsTable" class="history-list"><div class="empty-state"><strong>Loading change history…</strong><span>Shared-workspace changes will appear here.</span></div></div></section>
 </section>
 <div class="toast-region" id="toastRegion"></div>
 <script>
@@ -624,7 +681,7 @@ async function loadSystemLogs(){
  const result=await cloudRequest('system-logs-list');
  const logs=result.logs||[];$('#systemLogTotal').textContent=logs.length+' entr'+(logs.length===1?'y':'ies');$('#logCount').textContent=logs.length;
  if(status)status.textContent='Live feed · refreshes every 10 seconds while this section is open';
- wrap.innerHTML=logs.length?'<table class="data-table"><thead><tr><th>Time</th><th>Level</th><th>Problem</th><th>User</th><th>Source</th><th>Details</th></tr></thead><tbody>'+logs.map(l=>'<tr><td>'+esc(l.occurredAt?new Date(l.occurredAt).toLocaleString():'—')+'</td><td><span class="user-state '+(l.level==='error'?'disabled':'active')+'">'+esc(String(l.level||'error').toUpperCase())+'</span></td><td><strong>'+safeLogText(l.message||'Unknown error')+'</strong><small style="display:block;color:var(--muted)">'+safeLogText(l.route||'')+'</small></td><td>'+esc(l.displayName||l.username||'Unknown')+'</td><td>'+safeLogText(l.source||'app')+'</td><td><details><summary>View details</summary><pre style="white-space:pre-wrap;max-width:440px;overflow-wrap:anywhere">'+safeLogText(l.details||'No stack details supplied.')+'</pre></details></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">No system errors or warnings have been recorded.</div>';
+ wrap.innerHTML=logs.length?'<div class="history-cards">'+logs.map((l,i)=>'<article class="history-card log-card"><div class="history-card-top"><div class="history-card-title"><span class="history-index">#'+(logs.length-i)+'</span><h3>'+safeLogText(l.message||'Unknown error')+'</h3></div><span class="history-badge '+(String(l.level||'error').toLowerCase()==='error'?'history-badge-error':'history-badge-warning')+'">'+esc(String(l.level||'error').toUpperCase())+'</span></div><p class="history-route">'+safeLogText(l.route||'No route provided')+'</p><div class="history-meta"><div><span>Time</span><strong>'+esc(l.occurredAt?new Date(l.occurredAt).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'medium'}):'—')+'</strong></div><div><span>User</span><strong>'+esc(l.displayName||l.username||'Unknown')+'</strong></div><div><span>Source</span><strong>'+safeLogText(l.source||'app')+'</strong></div></div><details class="history-details"><summary>View technical details</summary><pre>'+safeLogText(l.details||'No stack details supplied.')+'</pre></details></article>').join('')+'</div>':'<div class="empty-state"><strong>No system errors or warnings</strong><span>There are currently no recorded system logs to display.</span></div>';
 }
 function footprintValue(value){if(value===null||value===undefined)return '—';if(typeof value==='string')return value;if(typeof value==='object')return JSON.stringify(value,null,2);return String(value)}
 function renderFootprints(){
@@ -633,7 +690,7 @@ function renderFootprints(){
  $('#footprintTotal').textContent=rows.length+' change'+(rows.length===1?'':'s');
  const labels={created:'Created',updated:'Updated',deleted:'Deleted',attachment_uploaded:'Attachment uploaded'};
  const kindLabel={trainees:'Trainee',audits:'QA audit',coachings:'Coaching',weekly_reports:'Weekly report',files:'File record',feature_ideas:'Feature idea',trainee_history:'Trainee history',attachment:'Attachment'};
- wrap.innerHTML=rows.length?'<table class="data-table footprint-table"><thead><tr><th>Date &amp; time (PHT)</th><th>Changed by</th><th>Action</th><th>Record</th><th>Data changed</th></tr></thead><tbody>'+rows.map(r=>{const fields=Array.isArray(r.changed_fields)?r.changed_fields:[];const details=fields.length?'<details><summary>View '+fields.length+' field'+(fields.length===1?'':'s')+'</summary><div class="footprint-diff">'+fields.map(f=>'<div class="footprint-field"><strong>'+esc(f.field)+'</strong><div class="footprint-values"><div><small>Before</small><pre>'+esc(footprintValue(f.before))+'</pre></div><div><small>After</small><pre>'+esc(footprintValue(f.after))+'</pre></div></div></div>').join('')+'</div></details>':'—';return '<tr><td>'+esc(r.occurred_at?new Date(r.occurred_at).toLocaleString("en-PH",{timeZone:"Asia/Manila",dateStyle:"medium",timeStyle:"medium"}):'—')+'</td><td><strong>'+esc(r.actor_display_name||r.actor_username||'Unknown')+'</strong><small class="secondary-cell">'+esc('@'+(r.actor_username||'unknown'))+' · '+esc(String(r.actor_role||'').toUpperCase())+'</small></td><td><span class="status-pill '+(r.action==='deleted'?'cancelled':r.action==='created'?'completed':'pending')+'">'+esc(labels[r.action]||r.action)+'</span></td><td><strong>'+esc(kindLabel[r.record_type]||r.record_type||'Record')+'</strong><small class="secondary-cell">'+esc(r.record_label||r.record_key||'—')+'</small></td><td>'+details+'</td></tr>'}).join('')+'</tbody></table>':'<div class="empty-state"><strong>No matching changes</strong>New shared-workspace changes will appear here.</div>';
+ wrap.innerHTML=rows.length?'<div class="history-cards">'+rows.map((r,i)=>{const fields=Array.isArray(r.changed_fields)?r.changed_fields:[];const details=fields.length?'<details class="history-details"><summary>View '+fields.length+' changed field'+(fields.length===1?'':'s')+'</summary><div class="footprint-diff">'+fields.map(f=>'<div class="footprint-field"><strong>'+esc(f.field)+'</strong><div class="footprint-values"><div><small>Before</small><pre>'+esc(footprintValue(f.before))+'</pre></div><div><small>After</small><pre>'+esc(footprintValue(f.after))+'</pre></div></div></div>').join('')+'</div></details>':'<p class="history-no-details">No field-level details were recorded for this change.</p>';return '<article class="history-card footprint-card"><div class="history-card-top"><div class="history-card-title"><span class="history-index">#'+(rows.length-i)+'</span><h3>'+esc(kindLabel[r.record_type]||r.record_type||'Record')+'</h3></div><span class="history-badge '+(r.action==='deleted'?'history-badge-error':r.action==='created'?'history-badge-success':'history-badge-neutral')+'">'+esc(labels[r.action]||r.action||'Changed')+'</span></div><p class="history-record-label">'+esc(r.record_label||r.record_key||'No record label')+'</p><div class="history-meta"><div><span>Date &amp; time (PHT)</span><strong>'+esc(r.occurred_at?new Date(r.occurred_at).toLocaleString("en-PH",{timeZone:"Asia/Manila",dateStyle:"medium",timeStyle:"medium"}):'—')+'</strong></div><div><span>Changed by</span><strong>'+esc(r.actor_display_name||r.actor_username||'Unknown')+'</strong><small>'+esc('@'+(r.actor_username||'unknown'))+' · '+esc(String(r.actor_role||'').toUpperCase())+'</small></div><div><span>Record type</span><strong>'+esc(kindLabel[r.record_type]||r.record_type||'Record')+'</strong></div></div>'+details+'</article>'}).join('')+'</div>':'<div class="empty-state"><strong>No matching changes</strong><span>New shared-workspace changes will appear here when records are created, updated, or deleted.</span></div>';
 }
 async function loadFootprints(){
  if(!canViewFootprints())return;const status=$('#footprintStatus'),wrap=$('#footprintsTable');if(status)status.textContent='Loading latest changes…';
