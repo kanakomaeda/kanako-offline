@@ -78,12 +78,14 @@ body[data-theme="dark"]{--ink:#e7edf8;--muted:#9baac0;--line:#2a3850;--surface:#
 @media(max-width:1180px){.files-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.file-card{grid-template-columns:minmax(0,1fr);gap:8px}.file-card-head{grid-column:1;grid-row:1}.paired-files{grid-column:1;grid-row:2}.file-card-footer{grid-column:1;grid-row:3;flex-direction:row;align-items:center;justify-content:flex-end;padding-top:8px;border-top:1px solid #edf1f6;margin-top:0}.file-card-footer>span:first-child{display:none}}
 
+/* Prevent any nested vertical scroll box from clipping the final audit rows. */
+#logsView .audit-history-wrap,#footprintsView .audit-history-wrap{overflow:visible!important}
 /* Final layout fix: let the Footprint and System Logs pages grow to the full content height. */
 html,body{height:auto;min-height:100%;overflow-y:auto!important}
 .app-shell,.main{height:auto!important;min-height:100vh;overflow:visible!important}
 #logsView,#footprintsView{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;padding-bottom:180px!important;contain:none!important}
 #logsView>.panel,#footprintsView>.panel{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important}
-#logsView .audit-history-wrap,#footprintsView .audit-history-wrap{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow-x:auto!important;overflow-y:visible!important;contain:none!important;padding-bottom:64px!important;margin-bottom:40px!important}
+#logsView .audit-history-wrap,#footprintsView .audit-history-wrap{display:flow-root;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important;padding-bottom:64px!important;margin-bottom:40px!important}
 #logsView .data-table tbody tr:last-child td,#footprintsView .data-table tbody tr:last-child td{padding-bottom:48px!important}
 </style>
 </head>
