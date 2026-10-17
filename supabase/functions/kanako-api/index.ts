@@ -370,6 +370,69 @@ async function handler(req: Request) {
       if (!verified.ok) return response(origin, { error: verified.message }, 403);
     }
 
+    if (action === "ai-coaching-feedback") {
+      const apiKey = Deno.env.get("OPENROUTER_API_KEY") || "";
+      if (!apiKey) return response(origin, { error: "AI coaching is not configured yet. Add OPENROUTER_API_KEY to the Supabase Edge Function secrets, then retry." }, 503);
+      const input = body.coaching && typeof body.coaching === "object" ? body.coaching : {};
+      const traineeName = String(input.traineeName || "the VA").slice(0, 160);
+      const strengths = String(input.strengths || "").trim().slice(0, 5000);
+      const improvements = String(input.areasForImprovement || "").trim().slice(0, 7000);
+      const auditNotes = String(input.auditNotes || "").trim().slice(0, 4000);
+      const auditScore = String(input.auditScore || "").slice(0, 40);
+      const auditDate = String(input.auditDate || "").slice(0, 40);
+      const sessionDate = String(input.sessionDate || "").slice(0, 40);
+      const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
+      if (!strengths && !improvements && !auditNotes) return response(origin, { error: "Add Strengths / Wins, Areas for Improvement, or linked QA findings before generating feedback." }, 400);
+      const systemPrompt = "You are Kanako's evidence-based VA coaching assistant. Use only supplied QA/coaching evidence; do not invent behaviors, scores, incidents, causes, or achievements. Keep feedback supportive, specific, professional, non-interrogative, and actionable. Do not make employment decisions or claim certainty beyond the evidence. The VA must create their own SMART action plan, so ask the exact coaching question and provide prompts, but do not write the VA's plan for them. Return valid JSON only with string keys discussion_feedback and expected_outcome.";
+      const userPrompt = `Create coaching feedback using this exact structure and headings:
+Performance Assessment
+Strengths:
+Areas for Improvement:
+SMART Coaching Discussion
+[VA name], what is your SMART action plan for addressing these areas of improvement?
+Please consider:
+- Specific: What exact skills or behaviors will you work on improving?
+- Measurable: How will you measure your progress?
+- Achievable: What specific steps will you take to improve?
+- Relevant: How will your plan address the findings from your call audit?
+- Time-bound: When do you plan to achieve your target?
+Expected Outcome:
+
+VA name: ${traineeName}
+Coaching session date: ${sessionDate || "Not provided"}
+QA audit date: ${auditDate || "Not provided"}
+QA audit score: ${auditScore || "Not provided"}
+Strengths / Wins supplied by trainer:
+${strengths || "Not provided"}
+Areas for Improvement supplied by trainer:
+${improvements || "Not provided"}
+Other QA audit findings/notes:
+${auditNotes || "Not provided"}
+Existing trainee SMART plan (context only; do not rewrite it):
+${existingPlan || "Not provided"}
+
+Use concise bullets for strengths and improvement areas, preserving the trainer's meaning. If a category has no evidence, say "No specific evidence provided" rather than guessing. Tie expected outcomes directly to stated improvement areas and frame them as targets, not guaranteed results. discussion_feedback must contain the complete structured template including the exact SMART question and all five prompts. expected_outcome should be a concise separate paragraph with 1–3 observable outcomes.`;
+      const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
+        body: JSON.stringify({ model: "openrouter/free", temperature: 0.2, max_tokens: 1200, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], response_format: { type: "json_object" } }),
+        signal: AbortSignal.timeout(45000)
+      });
+      if (!aiResponse.ok) {
+        const detail = (await aiResponse.text()).slice(0, 500);
+        console.error("OpenRouter coaching request failed:", aiResponse.status, detail);
+        return response(origin, { error: aiResponse.status === 401 ? "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." : aiResponse.status === 429 ? "The free AI request limit has been reached. Please try again later." : "OpenRouter could not generate feedback right now. Please try again shortly." }, aiResponse.status === 429 ? 429 : 502);
+      }
+      const completion = await aiResponse.json();
+      const content = completion?.choices?.[0]?.message?.content;
+      let generated: any;
+      try { generated = typeof content === "string" ? JSON.parse(content) : content; } catch { generated = null; }
+      const discussionFeedback = String(generated?.discussion_feedback || "").trim();
+      const expectedOutcome = String(generated?.expected_outcome || "").trim();
+      if (!discussionFeedback || !expectedOutcome) return response(origin, { error: "The AI returned an incomplete response. Please generate again." }, 502);
+      return response(origin, { discussionFeedback, expectedOutcome, model: completion?.model || "openrouter/free" });
+    }
+
     if (action === "me") return response(origin, { user: cleanUser(user), salt: user.password_salt });
     if (action === "logout") {
       await DB.from("workspace_sessions").delete().eq("id", resolved.session.id);
