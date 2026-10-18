@@ -941,9 +941,17 @@ async function generateWeeklyReport(){
    const result=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(result.error||'AI service is unavailable.');
    const expected=new Set(criteria.map(([key])=>key));
-   (result.assessments||[]).forEach(item=>{if(expected.has(item.key)&&typeof item.assessment==='string'){const el=$('#fld_'+item.key+'_assessment');if(el)el.value=item.assessment}});
-   if(typeof result.overall_assessment==='string'&&$('#fld_overall_assessment'))$('#fld_overall_assessment').value=result.overall_assessment;
-   toast('AI assessments generated',scoreNotice+' AI refined the assessment wording; numerical scores were not changed.');
+   (result.assessments||[]).forEach(item=>{
+    if(!expected.has(item.key)||typeof item.assessment!=='string')return;
+    const scoreEl=$('#fld_'+item.key),assessmentEl=$('#fld_'+item.key+'_assessment');
+    if(scoreEl&&Number.isInteger(item.score)&&item.score>=0&&item.score<=100)scoreEl.value=String(item.score);
+    if(assessmentEl)assessmentEl.value=item.assessment;
+   });
+   const returnedScores=criteria.map(([key])=>Number($('#fld_'+key)?.value));
+   const overallScore=$('#fld_overall_score');
+   if(overallScore&&returnedScores.every(n=>Number.isFinite(n)))overallScore.value=String(Math.round(returnedScores.reduce((sum,n)=>sum+n,0)/4));
+   if($('#fld_overall_assessment'))$('#fld_overall_assessment').value=String(result.overall_status||'Developing – Requires Continued Coaching');
+   toast('AI weekly evaluation generated',scoreNotice+' AI generated evidence-based criterion assessments and scores. Review all entries before saving.');
   }catch(error){
    toast('Professional draft retained',scoreNotice+' AI could not run: '+(error.message||'service unavailable')+' The local evidence-based draft remains available for editing.',true);
   }finally{if(button){button.disabled=false;button.textContent='Generate from QA Audits + Coaching'}}
