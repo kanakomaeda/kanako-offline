@@ -36,6 +36,20 @@ export default async function handler(req, res) {
           discussion: String(c.discussion || '').slice(0, 2000),
           smartPlan: String(c.smartPlan || '').slice(0, 1500),
           outcome: String(c.outcome || '').slice(0, 1000)
+        })) : [],
+        irNteRecords: Array.isArray(evidence.irNteRecords) ? evidence.irNteRecords.slice(0, 20).map(r => ({
+          type: String(r.type || '').slice(0, 80),
+          incidentDate: String(r.incidentDate || '').slice(0, 20),
+          issuedDate: String(r.issuedDate || '').slice(0, 20),
+          responseDeadline: String(r.responseDeadline || '').slice(0, 20),
+          responseReceivedDate: String(r.responseReceivedDate || '').slice(0, 20),
+          category: String(r.category || '').slice(0, 120),
+          subject: String(r.subject || '').slice(0, 500),
+          details: String(r.details || '').slice(0, 2000),
+          policy: String(r.policy || '').slice(0, 1000),
+          employeeExplanation: String(r.employeeExplanation || '').slice(0, 1500),
+          findings: String(r.findings || '').slice(0, 1500),
+          status: String(r.status || '').slice(0, 80)
         })) : []
       }
     };
