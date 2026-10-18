@@ -830,6 +830,23 @@ function wireTraineeStatusFields(){
  };
  statusEl.addEventListener('change',update);update();
 }
+function askWeeklyReportAIConsent(){
+ return new Promise(resolve=>{
+  const backdrop=document.createElement('div');
+  backdrop.id='weeklyReportAIConsent';
+  backdrop.setAttribute('role','presentation');
+  backdrop.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(8,15,30,.68);display:flex;align-items:center;justify-content:center;padding:20px;';
+  backdrop.innerHTML='<section role="dialog" aria-modal="true" aria-labelledby="weeklyReportAIConsentTitle" style="width:min(480px,100%);background:var(--surface,#fff);color:var(--ink,#26364d);border:1px solid var(--line,#e1e7f0);border-radius:16px;padding:24px;box-shadow:0 24px 80px #0005"><div style="font-size:10px;font-weight:850;letter-spacing:1.2px;color:var(--blue,#5269ed);margin-bottom:8px">OPTIONAL AI ASSISTANCE</div><h2 id="weeklyReportAIConsentTitle" style="font-size:19px;margin:0 0 10px">Would you like to use AI?</h2><p style="font-size:12px;line-height:1.7;margin:0 0 12px">Kanako has prepared a local, evidence-based weekly report draft. AI can help make the assessment wording more professional, but using it is optional.</p><div style="font-size:11px;line-height:1.7;padding:12px;border-radius:9px;background:var(--canvas,#f5f7fb);border:1px solid var(--line,#e1e7f0);margin-bottom:18px"><strong>Only if you choose “Use AI”:</strong> the selected trainee name, trainer name, evaluation dates, scores, QA notes, and coaching notes for this week will be sent to the AI provider configured by Kanako. Numerical scores will not be changed.<br><br><strong>If you choose “Continue Without AI”:</strong> no report details will be sent to the AI service, and the local draft will remain available.</div><div style="display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap"><button type="button" data-weekly-ai-choice="no" style="border:1px solid var(--line,#dce4ef);background:transparent;color:inherit;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:750;cursor:pointer">Continue Without AI</button><button type="button" data-weekly-ai-choice="yes" style="border:1px solid var(--blue,#5269ed);background:var(--blue,#5269ed);color:#fff;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:800;cursor:pointer">Use AI</button></div></section>';
+  let settled=false;
+  const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);backdrop.remove();resolve(value)};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish(false)}};
+  backdrop.addEventListener('click',e=>{if(e.target===backdrop)finish(false)});
+  backdrop.querySelectorAll('[data-weekly-ai-choice]').forEach(button=>button.addEventListener('click',()=>finish(button.dataset.weeklyAiChoice==='yes')));
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(backdrop);
+  backdrop.querySelector('[data-weekly-ai-choice="yes"]')?.focus();
+ });
+}
 async function generateWeeklyReport(){
  const traineeId=$('#fld_trainee_id')?.value,start=$('#fld_week_start')?.value,end=$('#fld_week_end')?.value;
  if(!traineeId||!start||!end){toast('Missing report details','Choose a trainee and evaluation week first.',true);return}
@@ -917,7 +934,7 @@ async function generateWeeklyReport(){
  }
  const provisional=criteria.filter(c=>categoryStats(c)===null&&avg!==null).length;
  const scoreNotice='Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). '+(provisional?provisional+' criterion score(s) use the provisional weekly QA average because category-level scores were not available.':'Category scores were extracted from QA line items where available.');
- const wantsAI=window.confirm('Would you like AI to professionalize the assessment wording? This sends the selected trainee name, scores, QA notes, and coaching notes for this week to the AI provider configured by Kanako. If you choose Cancel, the locally generated evidence-based draft remains available.');
+ const wantsAI=await askWeeklyReportAIConsent();
  if(wantsAI){
   const aiButton=$('#generateWeeklyReport');if(aiButton){aiButton.disabled=true;aiButton.textContent='Generating AI Assessments…'}
   try{
