@@ -942,7 +942,8 @@ async function generateWeeklyReport(){
     criteria:criteria.map(([key,label])=>({key,name:label,score:scoreMap[key],assessment:$('#fld_'+key+'_assessment')?.value||''})),
     evidence:{
      audits:audits.map(a=>({date:a.audit_date||'',score:a.score===null||a.score===undefined||a.score===''?null:Number(a.score),strengths:a.strengths||'',gaps:a.gaps||'',notes:a.notes||''})),
-     coachings:coachings.map(c=>({date:c.session_date||'',focus:c.focus_areas||'',strengths:c.strengths||'',discussion:c.discussion_notes||'',smartPlan:c.trainee_smart_plan||'',outcome:c.outcome||''})),\n      irNteRecords:irNteRecords.map(r=>({type:r.document_type||'',incidentDate:r.incident_date||'',issuedDate:r.issued_date||'',responseDeadline:r.response_deadline||'',responseReceivedDate:r.response_received_date||'',category:r.category||'',subject:r.subject||'',details:r.incident_details||'',policy:r.policy_reference||'',employeeExplanation:r.employee_explanation||'',findings:r.resolution||'',status:r.status||''}))
+     coachings:coachings.map(c=>({date:c.session_date||'',focus:c.focus_areas||'',strengths:c.strengths||'',discussion:c.discussion_notes||'',smartPlan:c.trainee_smart_plan||'',outcome:c.outcome||''})),
+      irNteRecords:irNteRecords.map(r=>({type:r.document_type||'',incidentDate:r.incident_date||'',issuedDate:r.issued_date||'',responseDeadline:r.response_deadline||'',responseReceivedDate:r.response_received_date||'',category:r.category||'',subject:r.subject||'',details:r.incident_details||'',policy:r.policy_reference||'',employeeExplanation:r.employee_explanation||'',findings:r.resolution||'',status:r.status||''}))
     }
    };
    const response=await fetch('/api/weekly-report-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(aiPayload)});
