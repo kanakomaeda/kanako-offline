@@ -833,30 +833,91 @@ function wireTraineeStatusFields(){
 function generateWeeklyReport(){
  const traineeId=$('#fld_trainee_id')?.value,start=$('#fld_week_start')?.value,end=$('#fld_week_end')?.value;
  if(!traineeId||!start||!end){toast('Missing report details','Choose a trainee and evaluation week first.',true);return}
- const dateInRange=v=>{const s=String(v||'').slice(0,10);return !!s&&s>=start&&s<=end};
- const audits=data.audits.filter(a=>String(a.trainee_id)===String(traineeId)&&dateInRange(a.audit_date));
+ if(end<start){toast('Invalid evaluation period','The week end cannot be earlier than the week start.',true);return}
+ const dateInRange=v=>{const d=String(v||'').slice(0,10);return !!d&&d>=start&&d<=end};
+ const audits=(data.audits||[]).filter(a=>String(a.trainee_id)===String(traineeId)&&dateInRange(a.audit_date));
  const auditIds=new Set(audits.map(a=>String(a.id)));
- const coachings=data.coachings.filter(c=>String(c.trainee_id)===String(traineeId)&&(dateInRange(c.session_date)||(!c.session_date&&auditIds.has(String(c.qa_audit_id)))));
- if(!audits.length&&!coachings.length){toast('No records for this week','No QA audits or coaching sessions were found for this trainee in the selected 7-day period.',true);return}
- const scoreValues=audits.map(a=>Number(a.score)).filter(n=>Number.isFinite(n)&&n>=0);
- const avg=scoreValues.length?Math.round(scoreValues.reduce((s,n)=>s+n,0)/scoreValues.length):null;
- const criteria=[['tool_navigation','Tool Navigation',['tool','navigation','bookingkoala','bk','crm','system','software','platform','click','calendar','schedule','dashboard']],['critical_thinking','Critical Thinking',['critical thinking','judgment','judgement','problem solving','problem-solving','decision','reasoning','research','investigat','troubleshoot','objection','scenario']],['communication','Communication',['communication','active listening','listening','tone','empathy','greeting','probing','clarif','response','call control','pacing','grammar','customer connection']],['core_values','Core Values',['core value','integrity','ownership','reliability','punctuality','attendance','accountability','adaptability','initiative','cooperation','professionalism','honesty','supportive']]];
- const auditItems=audits.flatMap(a=>[{type:'QA Strength',text:a.strengths||''},{type:'QA Improvement Area',text:a.gaps||''},{type:'QA Notes',text:a.notes||''}]);
- const coachingItems=coachings.flatMap(c=>[{type:'Coaching Focus',text:c.focus_areas||''},{type:'Coaching Strength',text:c.strengths||''},{type:'Coaching Feedback',text:c.discussion_notes||''},{type:'SMART Action Plan',text:c.trainee_smart_plan||''},{type:'Follow-up',text:c.outcome||''}]);
- const allItems=[...auditItems,...coachingItems].filter(x=>x.text&&x.text.trim());
- criteria.forEach(([key,label,hints])=>{
-  const scoreEl=$('#fld_'+key),assessment=$('#fld_'+key+'_assessment');
-  if(scoreEl&&avg!==null)scoreEl.value=avg;
-  const relevant=allItems.filter(x=>hints.some(k=>x.text.toLowerCase().includes(k)));
-  const evidence=[...new Set(relevant.map(x=>x.type+': '+x.text.trim()))].slice(0,5);
-  if(assessment)assessment.value=evidence.length?label+' findings from this week: '+evidence.join(' | '):(audits.length?'Based on '+audits.length+' QA audit(s), weekly average '+avg+'/100. No explicit category-specific finding was recorded, so please review the source audit and coaching notes before finalizing.':'Based on '+coachings.length+' coaching session(s). No explicit category-specific finding or numeric QA score was recorded for this category; please review before finalizing.');
+ const coachings=(data.coachings||[]).filter(c=>String(c.trainee_id)===String(traineeId)&&(dateInRange(c.session_date)||(!c.session_date&&auditIds.has(String(c.qa_audit_id)))));
+ if(!audits.length&&!coachings.length){toast('No records for this week','No QA audits or coaching sessions were found for this trainee between '+start+' and '+end+'. Check the audit/session dates and try again.',true);return}
+ const validScore=v=>v!==''&&v!==null&&v!==undefined&&Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=100;
+ const scoreValues=audits.filter(a=>validScore(a.score)).map(a=>Number(a.score));
+ const avg=scoreValues.length?Math.round(scoreValues.reduce((sum,n)=>sum+n,0)/scoreValues.length):null;
+ const criteria=[
+  {key:'tool_navigation',label:'Tool Navigation / SOP',categories:['Process Knowledge','Detailed information in CRM'],hints:['tool navigation','bookingkoala','calendar','crm','system navigation','platform','software','schedule','dashboard','process knowledge','detailed information in crm']},
+  {key:'critical_thinking',label:'Critical Thinking',categories:['Critical Thinking','Objection Handling','Proactive Guidance'],hints:['critical thinking','judgment','judgement','problem solving','decision','reasoning','research','investigat','troubleshoot','objection','proactive guidance','scenario']},
+  {key:'communication',label:'Communication',categories:['Greeting','Probing','AER','Understanding','Tone','Active Listening','Building Connection'],hints:['communication','active listening','listening','tone','empathy','greeting','probing','clarif','response','call control','pacing','grammar','customer connection','building connection','understanding','aer']},
+  {key:'core_values',label:'Core Values',categories:['Professionalism'],hints:['core value','integrity','ownership','reliability','punctuality','attendance','accountability','adaptability','initiative','cooperation','professionalism','honesty','supportive','core values']}
+ ];
+ const lineItemsFromAudit=a=>{
+  const raw=String(a.notes||'')+'\n'+String(a.gaps||'')+'\n'+String(a.strengths||'');
+  const out=[];
+  const re=/^\s*(Greeting|Probing|AER|Understanding|Tone|Process Knowledge|Objection Handling|Booking Offer|Critical Thinking|Terms and Conditions|After Sales Care|Detailed information in CRM|Active Listening|Building Connection|Proactive Guidance|Professionalism)\s*:\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?:\s*[—-]\s*(.*))?\s*$/gim;
+  let m;while((m=re.exec(raw))!==null){const score=Number(m[2]),goal=Number(m[3]);if(goal>0&&score>=0&&score<=goal&&!out.some(x=>x.category.toLowerCase()===m[1].toLowerCase()))out.push({category:m[1],score,goal,pct:score/goal*100,note:m[4]||''})}
+  return out;
+ };
+ const allLineItems=audits.flatMap(a=>lineItemsFromAudit(a).map(x=>({...x,auditDate:a.audit_date})));
+ const auditItems=audits.flatMap(a=>[{type:'QA strength',text:a.strengths||'',date:a.audit_date},{type:'QA improvement area',text:a.gaps||'',date:a.audit_date},{type:'QA evaluator notes',text:a.notes||'',date:a.audit_date}]);
+ const coachingItems=coachings.flatMap(c=>[{type:'Coaching focus',text:c.focus_areas||'',date:c.session_date},{type:'Coaching strength',text:c.strengths||'',date:c.session_date},{type:'Coaching discussion',text:c.discussion_notes||'',date:c.session_date},{type:'Trainee SMART action plan',text:c.trainee_smart_plan||'',date:c.session_date},{type:'Coaching follow-up',text:c.outcome||'',date:c.session_date}]);
+ const allItems=[...auditItems,...coachingItems].filter(x=>String(x.text||'').trim());
+ const escText=s=>String(s||'').replace(/\s+/g,' ').trim();
+ const sentence=s=>{const t=escText(s);return t?(/[.!?]$/.test(t)?t:t+'.'):''};
+ const findEvidence=(c,positive)=> {
+  const hints=c.hints;
+  const matched=allItems.filter(x=>hints.some(h=>String(x.text).toLowerCase().includes(h)));
+  const relevant=matched.filter(x=>positive?!/gap|improv|missed|below|inconsistent|needs? to|failed|not yet|incorrect|weakness/i.test(x.type+' '+x.text):!/strength|win|effective|demonstrated|success|improved|consistent|accurate|positive/i.test(x.type+' '+x.text)===false);
+  return [...new Set((relevant.length?relevant:matched).map(x=>sentence(x.text)))].filter(Boolean).slice(0,3);
+ };
+ const categoryStats=c=>{
+  const selected=allLineItems.filter(x=>c.categories.some(cat=>cat.toLowerCase()===x.category.toLowerCase()));
+  if(!selected.length)return null;
+  return Math.round(selected.reduce((sum,x)=>sum+x.pct,0)/selected.length);
+ };
+ const scoreMap={};
+ criteria.forEach(c=>{
+  const categoryScore=categoryStats(c);
+  // Prefer extracted category-specific QA line items. If the PDF only provides an overall score,
+  // retain the existing provisional average behavior and clearly disclose the limitation.
+  const score=categoryScore!==null?categoryScore:avg;
+  scoreMap[c.key]=score;
+  const scoreEl=$('#fld_'+c.key),assessment=$('#fld_'+c.key+'_assessment');
+  if(scoreEl)scoreEl.value=score===null?'':String(score);
+  const strengths=findEvidence(c,true);
+  const gaps=findEvidence(c,false);
+  const matchedItems=allItems.filter(x=>c.hints.some(h=>String(x.text).toLowerCase().includes(h)));
+  const sourceScores=allLineItems.filter(x=>c.categories.some(cat=>cat.toLowerCase()===x.category.toLowerCase()));
+  const scoreContext=categoryScore!==null?'Category score calculated from '+sourceScores.length+' extracted QA line item(s).':'Provisional score based on the weekly overall QA average; no category-specific numeric score was available in the source records.';
+  const paragraphs=[];
+  if(score!==null)paragraphs.push('Performance rating: '+score+'/100. '+scoreContext);
+  if(strengths.length)paragraphs.push('Observed strengths: '+strengths.join(' '));
+  if(gaps.length)paragraphs.push('Development priorities: '+gaps.join(' '));
+  if(!strengths.length&&!gaps.length){
+   const notes=matchedItems.map(x=>sentence(x.text)).filter(Boolean).slice(0,2);
+   if(notes.length)paragraphs.push('Evidence reviewed: '+notes.join(' '));
+   else paragraphs.push('The available records do not contain specific evidence for this criterion. Review the original QA audit and coaching notes before finalizing this assessment.');
+  }
+  if(assessment)assessment.value=paragraphs.join('\n\n');
  });
- const overall=$('#fld_overall_score');if(overall){const vals=criteria.map(([k])=>Number($('#fld_'+k)?.value));overall.value=vals.every(Number.isFinite)?String(Math.round(vals.reduce((s,n)=>s+n,0)/4)):''}
+ const scoreList=criteria.map(c=>scoreMap[c.key]);
+ const overall=scoreList.every(v=>v!==null&&Number.isFinite(v))?Math.round(scoreList.reduce((sum,n)=>sum+n,0)/scoreList.length):null;
+ const overallEl=$('#fld_overall_score');if(overallEl)overallEl.value=overall===null?'':String(overall);
  const overallAssessment=$('#fld_overall_assessment');
- if(overallAssessment)overallAssessment.value='Weekly evidence: '+audits.length+' QA audit(s)'+(scoreValues.length?' with average score '+avg+'/100':' without a numeric QA score')+' and '+coachings.length+' coaching session(s). QA strengths, improvement areas, notes, coaching focus, discussion, SMART action plans, and follow-up outcomes were considered where recorded. Review the suggested category scores and assessments before saving.';
- toast('Weekly report populated','Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). Scores are whole numbers; review the report before saving.');
+ if(overallAssessment){
+  const coachingSummary=coachings.map(c=>[c.focus_areas,c.discussion_notes,c.trainee_smart_plan,c.outcome].filter(Boolean).map(escText).join(' ')).filter(Boolean);
+  const gapTexts=[...new Set([...audits.map(a=>escText(a.gaps)),...coachings.map(c=>escText(c.focus_areas))].filter(Boolean))].slice(0,4);
+  const strengths=[...new Set([...audits.map(a=>escText(a.strengths)),...coachings.map(c=>escText(c.strengths))].filter(Boolean))].slice(0,4);
+  const lines=[
+   'Evaluation period: '+start+' to '+end+'. Evidence reviewed: '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s).',
+   overall===null?'Overall score could not be calculated because one or more criterion scores are unavailable.':'Overall score: '+overall+'/100, calculated as the average of the four criterion scores.',
+   strengths.length?'Strengths documented this week: '+strengths.join(' | ')+'.':'No explicit strengths were documented in the available records.',
+   gapTexts.length?'Priority development areas: '+gapTexts.join(' | ')+'.':'No explicit improvement areas were documented in the available records.',
+   coachingSummary.length?'Coaching and follow-through reviewed: '+coachingSummary.slice(0,3).join(' | '):'No detailed coaching discussion or action-plan notes were available for this period.',
+   'This draft is based only on saved audit and coaching records. Verify provisional criterion scores against the original QA evidence before approving the report.'
+  ];
+  overallAssessment.value=lines.join('\n\n');
+ }
+ const provisional=criteria.filter(c=>categoryStats(c)===null&&avg!==null).length;
+ toast('Weekly report populated','Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). '+(provisional?' '+provisional+' criterion score(s) use the provisional weekly QA average because category-level scores were not available.':'Category scores were extracted from QA line items where available.')+' Review the evidence-based draft before saving.');
 }
-
 function wireScoreCalc(){const keys=['tool_navigation','critical_thinking','communication','core_values'];const update=()=>{const vals=keys.map(k=>$('#fld_'+k)?.value);const out=$('#fld_overall_score');if(out)out.value=vals.every(v=>v!==''&&v!==null&&Number.isFinite(Number(v)))?String(Math.round(vals.reduce((sum,v)=>sum+Number(v),0)/4)):''};keys.forEach(k=>$('#fld_'+k)?.addEventListener('input',update));update();const start=$('#fld_week_start'),end=$('#fld_week_end'),period=$('#fld_evaluation_period');const updatePeriod=()=>{if(!start||!end)return;const d=new Date(start.value+'T12:00:00');if(start.value&&Number.isFinite(d.getTime())){d.setDate(d.getDate()+6);end.value=d.toISOString().slice(0,10);if(period)period.value=start.value+' to '+end.value}};start?.addEventListener('change',updatePeriod);end?.addEventListener('change',()=>{if(start&&end&&start.value&&end.value){const d=new Date(start.value+'T12:00:00');d.setDate(d.getDate()+6);end.value=d.toISOString().slice(0,10);if(period)period.value=start.value+' to '+end.value}});updatePeriod();$('#generateWeeklyReport')?.addEventListener('click',generateWeeklyReport)}
 function closeModal(){$('#modalBackdrop').classList.add('hidden');modal=null}
 let kanakoFfmpegPromise=null;
