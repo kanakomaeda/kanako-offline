@@ -881,14 +881,26 @@ function generateWeeklyReport(){
  const allItems=[...auditItems,...coachingItems].filter(x=>x.text&&x.text.trim());
  criteria.forEach(([key,label,hints])=>{
   const scoreEl=$('#fld_'+key),assessment=$('#fld_'+key+'_assessment');
-  if(scoreEl&&avg!==null)scoreEl.value=avg;
+  const scorePatterns={
+   tool_navigation:/tool\s*navigation[^\n;|]{0,40}?(\d{1,3})\s*(?:\/\s*100|%)/i,
+   critical_thinking:/critical\s*thinking[^\n;|]{0,40}?(\d{1,3})\s*(?:\/\s*100|%)/i,
+   communication:/communication[^\n;|]{0,40}?(\d{1,3})\s*(?:\/\s*100|%)/i,
+   core_values:/core\s*values?[^\n;|]{0,40}?(\d{1,3})\s*(?:\/\s*100|%)/i
+  };
+  const lineScores=audits.map(a=>{const notes=String(a.notes||'');const match=notes.match(scorePatterns[key]);return match?Number(match[1]):null}).filter(n=>Number.isFinite(n)&&n>=0&&n<=100);
+  if(scoreEl&&lineScores.length)scoreEl.value=String(Math.round(lineScores.reduce((sum,n)=>sum+n,0)/lineScores.length));
+  else if(scoreEl)scoreEl.value='';
   const relevant=allItems.filter(x=>hints.some(k=>x.text.toLowerCase().includes(k)));
   const evidence=[...new Set(relevant.map(x=>x.type+': '+x.text.trim()))].slice(0,5);
   if(assessment)assessment.value=evidence.length?label+' findings from this week: '+evidence.join(' | '):(audits.length?'Based on '+audits.length+' QA audit(s), weekly average '+avg+'/100. No explicit category-specific finding was recorded, so please review the source audit and coaching notes before finalizing.':'Based on '+coachings.length+' coaching session(s). No explicit category-specific finding or numeric QA score was recorded for this category; please review before finalizing.');
  });
  const overall=$('#fld_overall_score');if(overall){const vals=criteria.map(([k])=>Number($('#fld_'+k)?.value));overall.value=vals.every(Number.isFinite)?String(Math.round(vals.reduce((s,n)=>s+n,0)/4)):''}
  const overallAssessment=$('#fld_overall_assessment');
- if(overallAssessment)overallAssessment.value='Weekly evidence: '+audits.length+' QA audit(s)'+(scoreValues.length?' with average score '+avg+'/100':' without a numeric QA score')+' and '+coachings.length+' coaching session(s). QA strengths, improvement areas, notes, coaching focus, discussion, SMART action plans, and follow-up outcomes were considered where recorded. Review the suggested category scores and assessments before saving.';
+ if(overallAssessment){
+  const auditSummary=audits.map(a=>'QA audit '+String(a.audit_date||'undated')+': score '+(a.score===null||a.score===undefined?'not recorded':String(a.score)+'/'+String(a.max_score||100))+'. Strengths: '+String(a.strengths||'not recorded')+'. Improvement areas: '+String(a.gaps||'not recorded')+'. Notes / line-item scores: '+String(a.notes||'not recorded')).join(' || ');
+  const coachingSummary=coachings.map((c,i)=>'Coaching '+(i+1)+' ('+String(c.session_date||'date not recorded')+', status '+String(c.status||'not recorded')+'): Focus: '+String(c.focus_areas||'not recorded')+'. Strengths / wins: '+String(c.strengths||'not recorded')+'. Discussion and feedback: '+String(c.discussion_notes||'not recorded')+'. Trainee SMART action plan: '+String(c.trainee_smart_plan||'not recorded')+'. Follow-up: '+String(c.outcome||'not recorded')).join(' || ');
+  overallAssessment.value='Evaluation period: '+start+' through '+end+'. Evidence included '+audits.length+' QA audit(s)'+(scoreValues.length?' with average overall QA score '+avg+'/100':' without a numeric overall QA score')+' and '+coachings.length+' coaching session(s). Criterion scores are populated only when a matching line-item score is explicitly recorded in QA audit notes; otherwise enter an evidence-based score manually. Full weekly QA evidence: '+(auditSummary||'No QA audit records found.')+' Full weekly coaching record: '+(coachingSummary||'No coaching sessions found.');
+ }
  toast('Weekly report populated','Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). Scores are whole numbers; review the report before saving.');
 }
 
