@@ -864,7 +864,7 @@ function generateWeeklyReport(){
  const findEvidence=(c,positive)=> {
   const hints=c.hints;
   const matched=allItems.filter(x=>hints.some(h=>String(x.text).toLowerCase().includes(h)));
-  const relevant=matched.filter(x=>positive?!/gap|improv|missed|below|inconsistent|needs? to|failed|not yet|incorrect|weakness/i.test(x.type+' '+x.text):!/strength|win|effective|demonstrated|success|improved|consistent|accurate|positive/i.test(x.type+' '+x.text)===false);
+  const relevant=matched.filter(x=>positive?/strength|win|effective|demonstrated|success|improved|consistent|accurate|positive/i.test(x.type+' '+x.text):/gap|improv|missed|below|inconsistent|needs? to|failed|not yet|incorrect|weakness|focus/i.test(x.type+' '+x.text));
   return [...new Set((relevant.length?relevant:matched).map(x=>sentence(x.text)))].filter(Boolean).slice(0,3);
  };
  const categoryStats=c=>{
