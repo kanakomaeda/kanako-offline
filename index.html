@@ -865,7 +865,24 @@ function wireTraineeStatusFields(){
  };
  statusEl.addEventListener('change',update);update();
 }
-function generateWeeklyReport(){
+function askWeeklyReportAIConsent(){
+ return new Promise(resolve=>{
+  const backdrop=document.createElement('div');
+  backdrop.id='weeklyReportAIConsent';
+  backdrop.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(8,15,30,.72);display:flex;align-items:center;justify-content:center;padding:20px;';
+  backdrop.innerHTML='<section role="dialog" aria-modal="true" aria-labelledby="weeklyReportAIConsentTitle" style="width:min(480px,100%);background:var(--surface,#fff);color:var(--ink,#26364d);border:1px solid var(--line,#e1e7f0);border-radius:16px;padding:24px;box-shadow:0 24px 80px #0005"><div style="font-size:10px;font-weight:850;letter-spacing:1.2px;color:var(--blue,#5269ed);margin-bottom:8px">OPTIONAL AI ASSISTANCE</div><h2 id="weeklyReportAIConsentTitle" style="font-size:19px;margin:0 0 10px">Would you like to use AI?</h2><p style="font-size:12px;line-height:1.7;margin:0 0 12px">Your weekly report draft is ready. AI can help make the assessment wording more professional, but using it is optional.</p><div style="font-size:11px;line-height:1.7;padding:12px;border-radius:9px;background:var(--canvas,#f5f7fb);border:1px solid var(--line,#e1e7f0);margin-bottom:18px"><strong>If you choose “Use AI”:</strong> the selected trainee and trainer names, evaluation dates, scores, QA notes, and coaching notes for this week will be sent to Kanako’s configured AI provider. Numerical scores will not be changed.<br><br><strong>If you choose “Continue Without AI”:</strong> no report details will be sent to the AI service, and the local draft will remain available.</div><div style="display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap"><button type="button" data-weekly-ai-choice="no" style="border:1px solid var(--line,#dce4ef);background:transparent;color:inherit;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:750;cursor:pointer">Continue Without AI</button><button type="button" data-weekly-ai-choice="yes" style="border:1px solid var(--blue,#5269ed);background:var(--blue,#5269ed);color:#fff;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:800;cursor:pointer">Use AI</button></div></section>';
+  let settled=false;
+  const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);backdrop.remove();resolve(value)};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish(false)}};
+  backdrop.addEventListener('click',e=>{if(e.target===backdrop)finish(false)});
+  backdrop.querySelectorAll('[data-weekly-ai-choice]').forEach(button=>button.addEventListener('click',()=>finish(button.dataset.weeklyAiChoice==='yes')));
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(backdrop);
+  backdrop.querySelector('[data-weekly-ai-choice="yes"]')?.focus();
+ });
+}
+
+async function generateWeeklyReport(){
  const traineeId=$('#fld_trainee_id')?.value,start=$('#fld_week_start')?.value,end=$('#fld_week_end')?.value;
  if(!traineeId||!start||!end){toast('Missing report details','Choose a trainee and evaluation week first.',true);return}
  const dateInRange=v=>{const s=String(v||'').slice(0,10);return !!s&&s>=start&&s<=end};
@@ -901,7 +918,38 @@ function generateWeeklyReport(){
   const coachingSummary=coachings.map((c,i)=>'Coaching '+(i+1)+' ('+String(c.session_date||'date not recorded')+', status '+String(c.status||'not recorded')+'): Focus: '+String(c.focus_areas||'not recorded')+'. Strengths / wins: '+String(c.strengths||'not recorded')+'. Discussion and feedback: '+String(c.discussion_notes||'not recorded')+'. Trainee SMART action plan: '+String(c.trainee_smart_plan||'not recorded')+'. Follow-up: '+String(c.outcome||'not recorded')).join(' || ');
   overallAssessment.value='Evaluation period: '+start+' through '+end+'. Evidence included '+audits.length+' QA audit(s)'+(scoreValues.length?' with average overall QA score '+avg+'/100':' without a numeric overall QA score')+' and '+coachings.length+' coaching session(s). Criterion scores are populated only when a matching line-item score is explicitly recorded in QA audit notes; otherwise enter an evidence-based score manually. Full weekly QA evidence: '+(auditSummary||'No QA audit records found.')+' Full weekly coaching record: '+(coachingSummary||'No coaching sessions found.');
  }
- toast('Weekly report populated','Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). Scores are whole numbers; review the report before saving.');
+ const scoreNotice='Included '+audits.length+' QA audit(s) and '+coachings.length+' coaching session(s). Scores are whole numbers.';
+ const wantsAI=await askWeeklyReportAIConsent();
+ if(wantsAI){
+  const button=$('#generateWeeklyReport');
+  if(button){button.disabled=true;button.textContent='Generating AI Assessments…'}
+  try{
+   const trainee=data.trainees.find(t=>String(t.id)===String(traineeId));
+   const scoreMap={};
+   criteria.forEach(([key,label])=>{const raw=$('#fld_'+key)?.value;scoreMap[key]=raw!==''&&raw!==undefined&&Number.isFinite(Number(raw))?Number(raw):null});
+   const aiPayload={
+    trainee:trainee?.full_name||trainee?.preferred_name||'Trainee',
+    trainer:$('#modalFields input[name="trainer_name"]')?.value||'Trainer',
+    period:start+' to '+end,
+    criteria:criteria.map(([key,label])=>({key,name:label,score:scoreMap[key],assessment:$('#fld_'+key+'_assessment')?.value||''})),
+    evidence:{
+     audits:audits.map(a=>({date:a.audit_date||'',score:a.score===null||a.score===undefined||a.score===''?null:Number(a.score),strengths:a.strengths||'',gaps:a.gaps||'',notes:a.notes||''})),
+     coachings:coachings.map(c=>({date:c.session_date||'',focus:c.focus_areas||'',strengths:c.strengths||'',discussion:c.discussion_notes||'',smartPlan:c.trainee_smart_plan||'',outcome:c.outcome||''}))
+    }
+   };
+   const response=await fetch('/api/weekly-report-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(aiPayload)});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||'AI service is unavailable.');
+   const expected=new Set(criteria.map(([key])=>key));
+   (result.assessments||[]).forEach(item=>{if(expected.has(item.key)&&typeof item.assessment==='string'){const el=$('#fld_'+item.key+'_assessment');if(el)el.value=item.assessment}});
+   if(typeof result.overall_assessment==='string'&&$('#fld_overall_assessment'))$('#fld_overall_assessment').value=result.overall_assessment;
+   toast('AI assessments generated',scoreNotice+' AI refined the assessment wording; numerical scores were not changed.');
+  }catch(error){
+   toast('Professional draft retained',scoreNotice+' AI could not run: '+(error.message||'service unavailable')+' The local evidence-based draft remains available for editing.',true);
+  }finally{if(button){button.disabled=false;button.textContent='Generate from QA Audits + Coaching'}}
+ }else{
+  toast('Weekly report populated',scoreNotice+' AI was not used. Review the local draft before saving.');
+ }
 }
 
 function wireScoreCalc(){const keys=['tool_navigation','critical_thinking','communication','core_values'];const update=()=>{const vals=keys.map(k=>$('#fld_'+k)?.value);const out=$('#fld_overall_score');if(out)out.value=vals.every(v=>v!==''&&v!==null&&Number.isFinite(Number(v)))?String(Math.round(vals.reduce((sum,v)=>sum+Number(v),0)/4)):''};keys.forEach(k=>$('#fld_'+k)?.addEventListener('input',update));update();const start=$('#fld_week_start'),end=$('#fld_week_end'),period=$('#fld_evaluation_period');const updatePeriod=()=>{if(!start||!end)return;const d=new Date(start.value+'T12:00:00');if(start.value&&Number.isFinite(d.getTime())){d.setDate(d.getDate()+6);end.value=d.toISOString().slice(0,10);if(period)period.value=start.value+' to '+end.value}};start?.addEventListener('change',updatePeriod);end?.addEventListener('change',()=>{if(start&&end&&start.value&&end.value){const d=new Date(start.value+'T12:00:00');d.setDate(d.getDate()+6);end.value=d.toISOString().slice(0,10);if(period)period.value=start.value+' to '+end.value}});updatePeriod();$('#generateWeeklyReport')?.addEventListener('click',generateWeeklyReport)}
