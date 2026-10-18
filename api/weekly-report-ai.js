@@ -80,7 +80,17 @@ export default async function handler(req, res) {
       const message = result?.error?.message || 'AI provider request failed.';
       return res.status(502).json({ error: message.slice(0, 300) });
     }
-    const output = String(result.output_text || '');
+    // The raw Responses API HTTP payload does not include the SDK-only output_text convenience property.
+    // Extract the text from the returned output message content instead.
+    const output = String(
+      result.output_text ||
+      (Array.isArray(result.output)
+        ? result.output.flatMap(item => Array.isArray(item.content) ? item.content : [])
+            .filter(part => part && (part.type === 'output_text' || typeof part.text === 'string'))
+            .map(part => part.text || '')
+            .join('')
+        : '')
+    );
     if (!output) return res.status(502).json({ error: 'The AI provider returned an empty response.' });
     const parsed = JSON.parse(output);
     const allowed = new Set(['tool_navigation', 'critical_thinking', 'communication', 'core_values']);
