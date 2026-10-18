@@ -96,11 +96,12 @@ export default async function handler(req, res) {
     if (!output) return res.status(502).json({ error: 'The AI provider returned an empty response.' });
     const parsed = JSON.parse(output);
     const allowed = new Set(['tool_navigation', 'critical_thinking', 'communication', 'core_values']);
-    const assessments = Array.isArray(parsed.assessments) ? parsed.assessments.filter(x => allowed.has(x.key) && typeof x.assessment === 'string').map(x => ({ key: x.key, assessment: x.assessment.slice(0, 5000) })) : [];
-    if (assessments.length !== 4 || typeof parsed.overall_assessment !== 'string') {
+    const assessments = Array.isArray(parsed.assessments) ? parsed.assessments.filter(x => allowed.has(x.key) && typeof x.assessment === 'string' && Number.isInteger(x.score) && x.score >= 0 && x.score <= 100).map(x => ({ key: x.key, score: x.score, assessment: x.assessment.slice(0, 5000) })) : [];
+    if (assessments.length !== 4 || typeof parsed.overall_assessment !== 'string' || typeof parsed.overall_status !== 'string') {
       return res.status(502).json({ error: 'The AI response did not match the required report structure.' });
     }
-    return res.status(200).json({ assessments, overall_assessment: parsed.overall_assessment.slice(0, 8000) });
+    const overallScore = Math.round(assessments.reduce((sum, item) => sum + item.score, 0) / 4);
+    return res.status(200).json({ assessments, overall_score: overallScore, overall_status: parsed.overall_status.slice(0, 120), overall_assessment: parsed.overall_assessment.slice(0, 2000) });
   } catch (error) {
     return res.status(500).json({ error: 'Could not generate AI assessments. ' + String(error?.message || '').slice(0, 180) });
   }
