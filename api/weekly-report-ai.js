@@ -63,15 +63,30 @@ export default async function handler(req, res) {
       },
       required: ['assessments', 'overall_assessment', 'overall_status']
     };
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const useOpenRouter = process.env.OPENAI_API_KEY.startsWith('sk-or-');
+    const instructions = "You are an experienced, fair VA training lead producing a weekly evaluation report. Use raw QA audit and coaching records as primary evidence; currentAssessment is a weak auto-generated draft and must not be copied or lightly paraphrased. For each criterion, write a specific, concise, professional trainer assessment in 2–4 sentences, explaining concrete strengths or gaps, impact on performance, and documented coaching progress where supported. Do not force unrelated evidence into a criterion. Assign a whole-number score from 0 to 100 for each criterion. If a score is explicitly present in the supplied criterion score, preserve it exactly. If null, derive a cautious evidence-based score from the raw QA/coaching records using this rubric: 90–100 consistently exceeds expectations with clear evidence; 80–89 performs well with limited gaps; 70–79 developing/partially consistent with identifiable gaps; 60–69 multiple material gaps or inconsistent performance; 0–59 serious or repeated deficiencies. Do not give 100 without exceptional explicit evidence. When there is genuinely insufficient evidence, use 70 as a provisional baseline and clearly state that evidence is limited. Scores should reflect the whole evaluation period and coaching follow-through. Calculate the overall score as the rounded arithmetic mean of the four criterion scores. Use status labels: 90–100 Exceeds Expectations; 80–89 Meets Expectations; 70–79 Developing – Requires Continued Coaching; 60–69 Below Expectations – Focused Coaching Required; 0–59 Unsatisfactory – Immediate Improvement Required. overall_assessment is a concise 1–2 sentence summary. Use respectful business English. Never invent events or coaching outcomes.";
+    const model = process.env.OPENAI_MODEL || (useOpenRouter ? 'openai/gpt-4o-mini' : 'gpt-4o-mini');
+    const response = await fetch(useOpenRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(useOpenRouter ? { 'HTTP-Referer': 'https://kanako-progress-hub.vercel.app', 'X-Title': 'Kanako Weekly Report' } : {})
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        instructions: "You are an experienced, fair VA training lead producing a weekly evaluation report. Use raw QA audit and coaching records as primary evidence; currentAssessment is a weak auto-generated draft and must not be copied or lightly paraphrased. For each criterion, write a specific, concise, professional trainer assessment in 2–4 sentences, explaining concrete strengths or gaps, impact on performance, and documented coaching progress where supported. Do not force unrelated evidence into a criterion. Assign a whole-number score from 0 to 100 for each criterion. If a score is explicitly present in the supplied criterion score, preserve it exactly. If null, derive a cautious evidence-based score from the raw QA/coaching records using this rubric: 90–100 consistently exceeds expectations with clear evidence; 80–89 performs well with limited gaps; 70–79 developing/partially consistent with identifiable gaps; 60–69 multiple material gaps or inconsistent performance; 0–59 serious or repeated deficiencies. Do not give 100 without exceptional explicit evidence. Do not infer a score from missing evidence alone: when there is genuinely insufficient evidence for a criterion, use 70 as a provisional baseline and clearly state that evidence is limited in the assessment. Scores should reflect the whole evaluation period and coaching follow-through, not just one phrase. Preserve explicitly supplied numeric scores. Calculate the overall score as the rounded arithmetic mean of the four returned criterion scores. overall_status must be one concise label aligned to the overall score: 90–100 Exceeds Expectations; 80–89 Meets Expectations; 70–79 Developing – Requires Continued Coaching; 60–69 Below Expectations – Focused Coaching Required; 0–59 Unsatisfactory – Immediate Improvement Required. overall_assessment should be a concise 1–2 sentence summary of the week's overall pattern and priority coaching need. Use respectful, direct business English. Never invent events, achievements, failures, motives, or coaching outcomes. Return scores and assessments for all four criteria.",
+      body: JSON.stringify(useOpenRouter ? {
+        model,
+        messages: [
+          { role: 'system', content: instructions },
+          { role: 'user', content: JSON.stringify(input) }
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'weekly_report_assessments', strict: true, schema }
+        },
+        max_tokens: 2200
+      } : {
+        model,
+        instructions,
         input: JSON.stringify(input),
         text: { format: { type: 'json_schema', name: 'weekly_report_assessments', strict: true, schema } },
         max_output_tokens: 2200
@@ -80,18 +95,17 @@ export default async function handler(req, res) {
     const result = await response.json();
     if (!response.ok) {
       const message = result?.error?.message || 'AI provider request failed.';
-      return res.status(502).json({ error: message.slice(0, 300) });
+      return res.status(502).json({ error: (message + (useOpenRouter ? ' Check that your OpenRouter key is active and the selected model is available.' : ' Check that your OpenAI Platform key is valid.')).slice(0, 300) });
     }
-    // The raw Responses API HTTP payload does not include the SDK-only output_text convenience property.
-    // Extract the text from the returned output message content instead.
-    const output = String(
-      result.output_text ||
-      (Array.isArray(result.output)
-        ? result.output.flatMap(item => Array.isArray(item.content) ? item.content : [])
-            .filter(part => part && (part.type === 'output_text' || typeof part.text === 'string'))
-            .map(part => part.text || '')
-            .join('')
-        : '')
+    const output = String(useOpenRouter
+      ? result?.choices?.[0]?.message?.content || ''
+      : result.output_text ||
+        (Array.isArray(result.output)
+          ? result.output.flatMap(item => Array.isArray(item.content) ? item.content : [])
+              .filter(part => part && (part.type === 'output_text' || typeof part.text === 'string'))
+              .map(part => part.text || '')
+              .join('')
+          : '')
     );
     if (!output) return res.status(502).json({ error: 'The AI provider returned an empty response.' });
     const parsed = JSON.parse(output);
