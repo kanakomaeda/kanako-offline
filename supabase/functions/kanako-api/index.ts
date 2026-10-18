@@ -5,7 +5,7 @@ const URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY")!;
 const DB = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const BUCKET = "kanako-workspace-files";
-const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","files","feature_ideas","system_logs"]);
+const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","files","feature_ideas","ir_nte_records","system_logs"]);
 const ALLOWED_ORIGINS = new Set([
   "https://kanako-onboarding-progress-hub.vercel.app",
   "https://kanako-progress-hub.vercel.app",
