@@ -894,7 +894,7 @@ function generateWeeklyReport(){
   const evidence=[...new Set(relevant.map(x=>x.type+': '+x.text.trim()))].slice(0,5);
   if(assessment)assessment.value=evidence.length?label+' findings from this week: '+evidence.join(' | '):(audits.length?'Based on '+audits.length+' QA audit(s), weekly average '+avg+'/100. No explicit category-specific finding was recorded, so please review the source audit and coaching notes before finalizing.':'Based on '+coachings.length+' coaching session(s). No explicit category-specific finding or numeric QA score was recorded for this category; please review before finalizing.');
  });
- const overall=$('#fld_overall_score');if(overall){const vals=criteria.map(([k])=>Number($('#fld_'+k)?.value));overall.value=vals.every(Number.isFinite)?String(Math.round(vals.reduce((s,n)=>s+n,0)/4)):''}
+ const overall=$('#fld_overall_score');if(overall){const vals=criteria.map(([k])=>$('#fld_'+k)?.value);overall.value=vals.every(v=>v!==''&&v!==undefined&&Number.isFinite(Number(v)))?String(Math.round(vals.reduce((sum,v)=>sum+Number(v),0)/4)) : ''}
  const overallAssessment=$('#fld_overall_assessment');
  if(overallAssessment){
   const auditSummary=audits.map(a=>'QA audit '+String(a.audit_date||'undated')+': score '+(a.score===null||a.score===undefined?'not recorded':String(a.score)+'/'+String(a.max_score||100))+'. Strengths: '+String(a.strengths||'not recorded')+'. Improvement areas: '+String(a.gaps||'not recorded')+'. Notes / line-item scores: '+String(a.notes||'not recorded')).join(' || ');
