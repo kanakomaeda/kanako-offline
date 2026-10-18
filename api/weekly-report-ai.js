@@ -52,14 +52,16 @@ export default async function handler(req, res) {
             additionalProperties: false,
             properties: {
               key: { type: 'string', enum: ['tool_navigation', 'critical_thinking', 'communication', 'core_values'] },
+              score: { type: 'integer', minimum: 0, maximum: 100 },
               assessment: { type: 'string' }
             },
-            required: ['key', 'assessment']
+            required: ['key', 'score', 'assessment']
           }
         },
-        overall_assessment: { type: 'string' }
+        overall_assessment: { type: 'string' },
+        overall_status: { type: 'string' }
       },
-      required: ['assessments', 'overall_assessment']
+      required: ['assessments', 'overall_assessment', 'overall_status']
     };
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -69,7 +71,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        instructions: 'You are an experienced VA training lead writing a substantive weekly performance evaluation, not a copy editor. Analyze the raw QA audits and coaching records, then synthesize what they demonstrate about the trainee during the stated evaluation period. The supplied currentAssessment is only a rough auto-generated draft: do NOT merely polish, paraphrase, or repeat it. Replace generic labels and copied note fragments with a coherent, evidence-based assessment that explains the demonstrated behavior, its impact on performance, and the most relevant strength or development need. For each criterion, use 3–5 specific sentences when evidence supports it: identify concrete observations from the QA/coaching evidence; distinguish strengths from gaps; explain what the evidence indicates about this competency; and mention coaching progress or a practical next focus only when supported by the records. Do not force evidence into an unrelated criterion. If evidence is thin or absent, explicitly say what cannot be concluded rather than inventing detail or padding the response. Avoid repeating the same sentence structure across all four criteria. The overall assessment should be a genuine 4–6 sentence synthesis of the week's pattern, strongest demonstrated behaviors, priority gaps, and documented coaching follow-through—not a list of raw notes. Use professional, respectful, direct business English and non-blaming coaching language. Use only supplied evidence. Never invent events, scores, achievements, failures, motives, or action plans. Preserve every numeric score exactly as supplied; do not calculate, change, or recommend scores.',
+        instructions: "You are an experienced, fair VA training lead producing a weekly evaluation report. Use raw QA audit and coaching records as primary evidence; currentAssessment is a weak auto-generated draft and must not be copied or lightly paraphrased. For each criterion, write a specific, concise, professional trainer assessment in 2–4 sentences, explaining concrete strengths or gaps, impact on performance, and documented coaching progress where supported. Do not force unrelated evidence into a criterion. Assign a whole-number score from 0 to 100 for each criterion. If a score is explicitly present in the supplied criterion score, preserve it exactly. If null, derive a cautious evidence-based score from the raw QA/coaching records using this rubric: 90–100 consistently exceeds expectations with clear evidence; 80–89 performs well with limited gaps; 70–79 developing/partially consistent with identifiable gaps; 60–69 multiple material gaps or inconsistent performance; 0–59 serious or repeated deficiencies. Do not give 100 without exceptional explicit evidence. Do not infer a score from missing evidence alone: when there is genuinely insufficient evidence for a criterion, use 70 as a provisional baseline and clearly state that evidence is limited in the assessment. Scores should reflect the whole evaluation period and coaching follow-through, not just one phrase. Preserve explicitly supplied numeric scores. Calculate the overall score as the rounded arithmetic mean of the four returned criterion scores. overall_status must be one concise label aligned to the overall score: 90–100 Exceeds Expectations; 80–89 Meets Expectations; 70–79 Developing – Requires Continued Coaching; 60–69 Below Expectations – Focused Coaching Required; 0–59 Unsatisfactory – Immediate Improvement Required. overall_assessment should be a concise 1–2 sentence summary of the week's overall pattern and priority coaching need. Use respectful, direct business English. Never invent events, achievements, failures, motives, or coaching outcomes. Return scores and assessments for all four criteria.",
         input: JSON.stringify(input),
         text: { format: { type: 'json_schema', name: 'weekly_report_assessments', strict: true, schema } },
         max_output_tokens: 2200
