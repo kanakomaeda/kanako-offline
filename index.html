@@ -919,6 +919,14 @@ async function generateWeeklyReport(){
   const evidence=[...new Set(relevant.map(x=>x.type+': '+x.text.trim()))].slice(0,5);
   if(assessment)assessment.value=evidence.length?label+' findings from this week: '+evidence.join(' | '):(audits.length?'Based on '+audits.length+' QA audit(s), weekly average '+avg+'/100. No explicit category-specific finding was recorded, so please review the source audit and coaching notes before finalizing.':'Based on '+coachings.length+' coaching session(s). No explicit category-specific finding or numeric QA score was recorded for this category; please review before finalizing.');
  });
+ if(irNteRecords.length){
+  const coreAssessment=$('#fld_core_values_assessment');
+  if(coreAssessment){
+   const documented='IR/NTE records relevant to Core Values this week: '+irNteSummary+' Review the documented findings and trainee explanation before deciding whether the Core Values score should change. A pending allegation alone must not reduce the score.';
+   coreAssessment.value=(coreAssessment.value?coreAssessment.value+'\n\n':'')+documented;
+  }
+ }
+
  const overall=$('#fld_overall_score');if(overall){const vals=criteria.map(([k])=>$('#fld_'+k)?.value);overall.value=vals.every(v=>v!==''&&v!==undefined&&Number.isFinite(Number(v)))?String(Math.round(vals.reduce((sum,v)=>sum+Number(v),0)/4)) : ''}
  const overallAssessment=$('#fld_overall_assessment');
  if(overallAssessment){
