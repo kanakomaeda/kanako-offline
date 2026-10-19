@@ -812,6 +812,24 @@ function renderReports(){let rows=filterRows(data.weekly_reports,$('#reportSearc
 function renderIRNTE(){let rows=filterRows(data.ir_nte_records,$('#irNteSearch').value);const tf=$('#irNteTypeFilter').value,sf=$('#irNteStatusFilter').value;if(tf)rows=rows.filter(r=>r.document_type===tf);if(sf)rows=rows.filter(r=>r.status===sf);rows.sort((a,b)=>String(b.incident_date||b.issued_date||b.created_at||'').localeCompare(String(a.incident_date||a.issued_date||a.created_at||'')));$('#irNteCount').textContent=rows.length+' records';$('#irNteTable').innerHTML=renderTable('ir_nte_records',rows,['document_type','trainee_id','incident_date','subject','status','response_deadline'])}
 function viewWeeklyReport(id){
  const r=byId('weekly_reports',id);if(!r)return;
+ // Refresh saved IR/NTE evidence when a report is opened, so later-added records for the
+ // selected evaluation week appear without recalculating or changing any criterion scores.
+ const weekStart=String(r.week_start||'').slice(0,10),weekEnd=String(r.week_end||'').slice(0,10);
+ const inReportWeek=value=>{const date=String(value||'').slice(0,10);return !!date&&!!weekStart&&!!weekEnd&&date>=weekStart&&date<=weekEnd};
+ const currentIrNte=(data.ir_nte_records||[]).filter(record=>String(record.trainee_id)===String(r.trainee_id)&&(inReportWeek(record.incident_date)||inReportWeek(record.issued_date)));
+ if(currentIrNte.length){
+  const currentSummary=currentIrNte.map((record,index)=>[(index+1)+'. '+String(record.document_type||'IR / NTE'),'Incident date: '+String(record.incident_date||'not recorded'),'Issued: '+String(record.issued_date||'not recorded'),'Category: '+String(record.category||'not specified'),'Subject: '+String(record.subject||'not recorded'),'Status: '+String(record.status||'not specified'),'Response deadline: '+String(record.response_deadline||'not recorded'),'Explanation received: '+String(record.response_received_date||'not recorded'),'Details: '+String(record.incident_details||'not recorded'),'Employee explanation: '+String(record.employee_explanation||'not recorded'),'Review findings / resolution: '+String(record.resolution||'not recorded')].join('. ')).join('\n');
+  const marker='IR/NTE records relevant to Core Values this week: ';
+  const previousCore=String(r.core_values_assessment||'');
+  const cleanCore=previousCore.replace(/\n\nIR\/NTE records relevant to Core Values this week:[\s\S]*$/,'');
+  const nextCore=(cleanCore?cleanCore+'\n\n':'')+marker+currentSummary+' Review the documented findings and trainee explanation before deciding whether the Core Values score should change. A pending allegation alone must not reduce the score.';
+  if(String(r.ir_nte_assessment||'')!==currentSummary||previousCore!==nextCore){
+   r.ir_nte_assessment=currentSummary;
+   r.core_values_assessment=nextCore;
+   r.updated_at=new Date().toISOString();
+   save();
+  }
+ }
  const trainee=person(r.trainee_id)||'Unknown trainee';
  const criteria=[['tool_navigation','Tool Navigation'],['critical_thinking','Critical Thinking'],['communication','Communication'],['core_values','Core Values']];
  const rows=criteria.map(([key,label])=>'<tr><th scope="row">'+esc(label)+'</th><td>'+esc(r[key]===null||r[key]===undefined||r[key]===''?'—':String(r[key])+'/100')+'</td><td>'+esc(r[key+'_assessment']||'No assessment recorded.')+'</td></tr>').join('');
