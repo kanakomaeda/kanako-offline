@@ -992,7 +992,7 @@ function wireCoachingTypeFields(){
    const mp4=$('#irNteCoachingMp4'),explanation=$('#fld_ir_nte_employee_explanation'),recordStatus=$('#fld_ir_nte_record_status');
    const selectedMp4=$('#fld_ir_nte_mp4_file')?.files?.[0]||null;const hasRecording=!!(record&&(record.mp4_file_id||record.mp4_storage_path))||!!selectedMp4;if(mp4)mp4.textContent=selectedMp4?'Selected recording: '+selectedMp4.name:record?(record.mp4_original_name||record.mp4_file_id||record.mp4_storage_path?'Current recording: '+(record.mp4_original_name||'MP4 recording attached'):'No MP4 recording attached yet.'):'Select an IR / NTE record to attach or view its recording.';const blocked=$('#irNteCoachingBlockedMessage');if(blocked){blocked.textContent=!record?'Cannot record IR / NTE coaching: select a linked IR / NTE record and attach its MP4 call recording.':!hasRecording?'Cannot record IR / NTE coaching for this record because no MP4 call recording is attached. Upload the MP4 in this form or attach it to the IR / NTE record first.':'';blocked.classList.toggle('hidden',kind!=='IR / NTE'||!blocked.textContent)}
    if(explanation&&document.activeElement!==explanation)explanation.value=record?.employee_explanation||'';
-   if(recordStatus)recordStatus.value=record?.status||'';
+   if(recordStatus){recordStatus.value=record?.status||'';recordStatus.required=kind==='IR / NTE';}
    if(irEl)irEl.required=kind==='IR / NTE';
   }
   const ai=$('#generateAiCoachingBtn');if(ai)ai.classList.toggle('hidden',kind!=='QA Audit');
