@@ -15,7 +15,10 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 function cors(origin: string | null) {
-  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://kanako-progress-hub.vercel.app";
+  // Allow only this project's Vercel preview deployments as well as the explicit production origins above.
+  // Preview hostnames are generated per deployment, so exact-origin entries would break on each new preview.
+  const isKanakoPreview = !!origin && /^https:\/\/kanako-onboarding-progress-[a-z0-9-]+-vapepokemon143-8805\.vercel\.app$/.test(origin);
+  const allow = origin && (ALLOWED_ORIGINS.has(origin) || isKanakoPreview) ? origin : "https://kanako-progress-hub.vercel.app";
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-device-timestamp, x-device-nonce, x-device-signature, x-device-public-key",
