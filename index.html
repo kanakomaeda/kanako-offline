@@ -1385,7 +1385,10 @@ $('#refreshUnlockRequests')?.addEventListener('click',()=>loadUnlockRequests().c
 // that tells a page whether an OS screenshot or recording tool is running.
 let focusLossLockPending=false;
 async function lockSessionAfterFocusLoss(){
-  if(focusLossLockPending||!currentUser||!cloudToken)return;
+  // Superuser sessions are exempt from focus-loss / hidden-tab session locking.
+  const role=String(currentUser?.role||'').trim().toLowerCase();
+  if(!currentUser||!cloudToken||deviceBindingExempt||role==='superuser'||isSuperuser())return;
+  if(focusLossLockPending)return;
   focusLossLockPending=true;
   try{
     await logout();
