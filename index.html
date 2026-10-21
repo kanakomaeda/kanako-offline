@@ -1389,7 +1389,7 @@ async function lockSessionAfterFocusLoss(){
   focusLossLockPending=true;
   try{
     await logout();
-    showAuthMessage('Session locked because Kanako lost browser focus or became hidden. Sign in again to continue. This is not proof that a recording occurred.');
+    showAuthMessage('Session locked because Kanako lost browser focus or became hidden. Sign in again to continue.');
   }catch(_){
     // Keep the fail-closed behavior: logout clears the local session before rendering sign-in.
   }finally{focusLossLockPending=false}
