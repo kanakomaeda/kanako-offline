@@ -588,10 +588,13 @@ function onboardingCompletionKey(){return 'kanako-how-it-works-completed-v1:'+St
 let screenWatermarkTimer=null;
 function updateSessionWatermark(){
  const el=$('#sessionWatermark');if(!el)return;
- if(!currentUser||String(currentUser.role||'').trim().toLowerCase()==='superuser'){
-  el.replaceChildren();delete el.dataset.label;el.classList.add('hidden');return;
+ const role=String(currentUser?.role||'').trim().toLowerCase();
+ const roleChip=String($('#sessionRoleChip')?.textContent||'').trim().toLowerCase();
+ const exempt=!!currentUser&&(deviceBindingExempt||role==='superuser'||roleChip==='superuser');
+ if(!currentUser||exempt){
+  el.replaceChildren();delete el.dataset.label;el.classList.add('hidden');el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true');return;
  }
- el.classList.remove('hidden');
+ el.style.removeProperty('display');el.removeAttribute('aria-hidden');el.classList.remove('hidden');
  const identity=String(currentUser.displayName||currentUser.username||'Authorized user').trim().slice(0,80);
  const timestamp=new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',dateStyle:'medium',timeStyle:'medium',hour12:true}).format(new Date());
  const label='KANAKO • '+identity+' • '+timestamp;
