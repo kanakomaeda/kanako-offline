@@ -15,7 +15,10 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 function cors(origin: string | null) {
-  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://kanako-progress-hub.vercel.app";
+  // Allow only this project's Vercel preview deployments as well as the explicit production origins above.
+  // Preview hostnames are generated per deployment, so exact-origin entries would break on each new preview.
+  const isKanakoPreview = !!origin && /^https:\/\/kanako-onboarding-progress-[a-z0-9-]+-vapepokemon143-8805\.vercel\.app$/.test(origin);
+  const allow = origin && (ALLOWED_ORIGINS.has(origin) || isKanakoPreview) ? origin : "https://kanako-progress-hub.vercel.app";
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-device-timestamp, x-device-nonce, x-device-signature, x-device-public-key",
@@ -372,7 +375,6 @@ async function handler(req: Request) {
 
     if (action === "ai-coaching-feedback") {
       const apiKey = Deno.env.get("OPENROUTER_API_KEY") || "";
-      if (!apiKey) return response(origin, { error: "AI coaching is not configured yet. Add OPENROUTER_API_KEY to the Supabase Edge Function secrets, then retry." }, 503);
       const input = body.coaching && typeof body.coaching === "object" ? body.coaching : {};
       const traineeName = String(input.traineeName || "the VA").slice(0, 160);
       const strengths = String(input.strengths || "").trim().slice(0, 5000);
@@ -383,6 +385,38 @@ async function handler(req: Request) {
       const sessionDate = String(input.sessionDate || "").slice(0, 40);
       const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
       if (!strengths && !improvements && !auditNotes) return response(origin, { error: "Add Strengths / Wins, Areas for Improvement, or linked QA findings before generating feedback." }, 400);
+      const asBullets = (value: string) => {
+        const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        return lines.length ? lines.map(line => "- " + line).join("\n") : "- No specific evidence provided.";
+      };
+      const fallbackResponse = (reason: string) => response(origin, {
+        discussionFeedback: `Performance Assessment
+
+Strengths:
+${asBullets(strengths)}
+
+Areas for Improvement:
+${asBullets(improvements || auditNotes)}
+
+SMART Coaching Discussion
+${traineeName}, what is your SMART action plan for addressing these areas of improvement?
+
+Please consider:
+- Specific: What exact skills or behaviors will you work on improving?
+- Measurable: How will you measure your progress?
+- Achievable: What specific steps will you take to improve?
+- Relevant: How will your plan address the findings from your call audit?
+- Time-bound: When do you plan to achieve your target?`,
+        expectedOutcome: improvements
+          ? "The VA will work on the documented improvement areas and demonstrate measurable progress during the next QA review. Areas to verify: " + improvements.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 3).join("; ") + "."
+          : auditNotes
+            ? "The VA will apply the agreed SMART action plan to the documented QA findings, with progress checked during the next QA review."
+            : "The VA will continue the documented strengths and follow the agreed SMART action plan, with progress verified during the next coaching follow-up.",
+        model: "evidence-based-fallback",
+        fallback: true,
+        notice: reason
+      });
+      if (!apiKey) return fallbackResponse("OpenRouter is not configured. A template was prepared from the supplied evidence.");
       const systemPrompt = "You are Kanako's evidence-based VA coaching assistant. Use only supplied QA/coaching evidence; do not invent behaviors, scores, incidents, causes, or achievements. Keep feedback supportive, specific, professional, non-interrogative, and actionable. Do not make employment decisions or claim certainty beyond the evidence. The VA must create their own SMART action plan, so ask the exact coaching question and provide prompts, but do not write the VA's plan for them. Return valid JSON only with string keys discussion_feedback and expected_outcome.";
       const userPrompt = `Create coaching feedback using this exact structure and headings:
 Performance Assessment
@@ -425,12 +459,18 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
           ]
         };
         if (useJsonMode) payload.response_format = { type: "json_object" };
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(45000)
-        });
+        let res: Response;
+        try {
+          res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(15000)
+          });
+        } catch (error) {
+          console.error("OpenRouter coaching request timed out or failed:", String(error));
+          return { ok: false as const, status: 0 };
+        }
         if (!res.ok) {
           const detail = (await res.text()).slice(0, 500);
           console.error("OpenRouter coaching request failed:", res.status, detail);
@@ -439,10 +479,10 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
         const json = await res.json();
         const message = json?.choices?.[0]?.message;
         let content: any = message?.content;
-        if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\\n");
+        if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\n");
         if (typeof content !== "string") content = "";
         let parsed: any = null;
-        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "");
+        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
         try { parsed = JSON.parse(cleaned); } catch {
           const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
           if (first >= 0 && last > first) { try { parsed = JSON.parse(cleaned.slice(first, last + 1)); } catch { parsed = null; } }
@@ -453,22 +493,32 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
       }
       let attempt = await requestCoaching(true);
       if (!attempt.ok) {
-        if (attempt.status === 401) return response(origin, { error: "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." }, 502);
-        if (attempt.status === 429) return response(origin, { error: "The free AI request limit has been reached. Please try again later." }, 429);
-        return response(origin, { error: "OpenRouter could not generate feedback right now. Please try again shortly." }, 502);
+        const reason = attempt.status === 401
+          ? "OpenRouter rejected the API key."
+          : attempt.status === 429
+            ? "The free AI request limit was reached."
+            : attempt.status === 0
+              ? "OpenRouter timed out or was unreachable."
+              : "OpenRouter is temporarily unavailable.";
+        return fallbackResponse(reason + " An evidence-based template was prepared from the supplied notes.");
       }
       if (!attempt.discussion || !attempt.outcome) {
         console.warn("OpenRouter returned incomplete coaching JSON; retrying with compatibility mode.", { model: attempt.model, finishReason: attempt.finishReason, contentLength: attempt.contentLength });
         attempt = await requestCoaching(false);
       }
       if (!attempt.ok) {
-        if (attempt.status === 401) return response(origin, { error: "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." }, 502);
-        if (attempt.status === 429) return response(origin, { error: "The free AI request limit has been reached. Please try again later." }, 429);
-        return response(origin, { error: "OpenRouter could not generate feedback right now. Please try again shortly." }, 502);
+        const reason = attempt.status === 401
+          ? "OpenRouter rejected the API key."
+          : attempt.status === 429
+            ? "The free AI request limit was reached."
+            : attempt.status === 0
+              ? "OpenRouter timed out or was unreachable."
+              : "OpenRouter is temporarily unavailable.";
+        return fallbackResponse(reason + " An evidence-based template was prepared from the supplied notes.");
       }
       if (!attempt.discussion || !attempt.outcome) {
         console.error("OpenRouter coaching response remained incomplete after retry.", { model: attempt.model, finishReason: attempt.finishReason, contentLength: attempt.contentLength });
-        return response(origin, { error: "The AI provider returned incomplete coaching text twice. Please retry in a moment; no coaching data was saved." }, 502);
+        return fallbackResponse("OpenRouter returned incomplete text twice. An evidence-based template was prepared from the supplied notes.");
       }
       return response(origin, { discussionFeedback: attempt.discussion, expectedOutcome: attempt.outcome, model: attempt.model });
     }
@@ -664,7 +714,7 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
       return response(origin, { ok: true, id: logId }, 201);
     }
     if (action === "system-logs-list") {
-      if (user.role !== "superuser" && user.role !== "admin") return response(origin, { error: "Only Admin and Superuser accounts can view system logs." }, 403);
+      if (String(user.role || "").toLowerCase() !== "superuser") return response(origin, { error: "Only the Superuser can view system logs." }, 403);
       const { data, error } = await DB.from("workspace_records").select("record_key,payload,updated_at").eq("record_type", "system_logs").order("updated_at", { ascending: false }).limit(500);
       if (error) throw error;
       return response(origin, { logs: (data || []).map(row => ({ ...(row.payload || {}), id: row.record_key, updatedAt: row.updated_at })) });
