@@ -527,16 +527,20 @@ async function repairExistingQaAuditDates(){
     const blob=await response.blob();
     const filename=record.pdf_original_name||'QA-audit.pdf';
     const parsed=await extractAuditPdf(new File([blob],filename,{type:'application/pdf'}));
-    if(!parsed.audit_date){unreadable++;continue}
     const audit=data.audits.find(a=>String(a.source_file_id||'')===String(record.id)||String(a.id||'')===String(record.source_audit_id));
     if(!audit){unreadable++;continue}
-    const oldDate=String(audit.audit_date||'');
-    if(oldDate===parsed.audit_date&&String(record.reference_date||'')===parsed.audit_date){unchanged++;continue}
-    audit.audit_date=parsed.audit_date;
+    // The audit record may already have the PDF-derived date even when the file's upload/reference date is stale.
+    const verifiedPdfDate=parsed.audit_date||'';
+    const existingAuditDate=String(audit.audit_date||'');
+    const targetDate=verifiedPdfDate||existingAuditDate;
+    if(!targetDate){unreadable++;continue}
+    const oldDate=existingAuditDate;
+    if(oldDate===targetDate&&String(record.reference_date||'')===targetDate){unchanged++;continue}
+    audit.audit_date=targetDate;
     if(parsed.week_label)audit.week_label=parsed.week_label;
-    record.reference_date=parsed.audit_date;
+    record.reference_date=targetDate;
     if(parsed.week_label)record.week_label=parsed.week_label;
-    (data.coachings||[]).forEach(c=>{if(String(c.audit_id||c.source_audit_id||'')===String(audit.id)&&String(c.session_date||'')===oldDate)c.session_date=parsed.audit_date});
+    (data.coachings||[]).forEach(c=>{if(String(c.audit_id||c.source_audit_id||'')===String(audit.id)&&String(c.session_date||'')===oldDate)c.session_date=targetDate});
     corrected++;
    }catch(err){unreadable++;console.warn('QA PDF date correction failed:',record.pdf_original_name||record.id,err)}
   }
