@@ -386,8 +386,8 @@ async function handler(req: Request) {
       const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
       if (!strengths && !improvements && !auditNotes) return response(origin, { error: "Add Strengths / Wins, Areas for Improvement, or linked QA findings before generating feedback." }, 400);
       const asBullets = (value: string) => {
-        const lines = value.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
-        return lines.length ? lines.map(line => "- " + line).join("\\n") : "- No specific evidence provided.";
+        const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        return lines.length ? lines.map(line => "- " + line).join("\n") : "- No specific evidence provided.";
       };
       const fallbackResponse = (reason: string) => response(origin, {
         discussionFeedback: `Performance Assessment
@@ -408,7 +408,7 @@ Please consider:
 - Relevant: How will your plan address the findings from your call audit?
 - Time-bound: When do you plan to achieve your target?`,
         expectedOutcome: improvements
-          ? "The VA will work on the documented improvement areas and demonstrate measurable progress during the next QA review. Areas to verify: " + improvements.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean).slice(0, 3).join("; ") + "."
+          ? "The VA will work on the documented improvement areas and demonstrate measurable progress during the next QA review. Areas to verify: " + improvements.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 3).join("; ") + "."
           : auditNotes
             ? "The VA will apply the agreed SMART action plan to the documented QA findings, with progress checked during the next QA review."
             : "The VA will continue the documented strengths and follow the agreed SMART action plan, with progress verified during the next coaching follow-up.",
@@ -479,10 +479,10 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
         const json = await res.json();
         const message = json?.choices?.[0]?.message;
         let content: any = message?.content;
-        if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\\n");
+        if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\n");
         if (typeof content !== "string") content = "";
         let parsed: any = null;
-        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "");
+        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\\s*\`\`\`$/, "");
         try { parsed = JSON.parse(cleaned); } catch {
           const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
           if (first >= 0 && last > first) { try { parsed = JSON.parse(cleaned.slice(first, last + 1)); } catch { parsed = null; } }
