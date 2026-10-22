@@ -383,6 +383,38 @@ async function handler(req: Request) {
       const sessionDate = String(input.sessionDate || "").slice(0, 40);
       const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
       if (!strengths && !improvements && !auditNotes) return response(origin, { error: "Add Strengths / Wins, Areas for Improvement, or linked QA findings before generating feedback." }, 400);
+
+      // A perfect QA score must not be framed as a performance gap. Use a deterministic
+      // maintenance-focused structure so the free model cannot invent deficiencies.
+      const scoreMatch = auditScore.match(/^\\s*(\\d+(?:\\.\\d+)?)\\s*(?:\\/\\s*100|%|points?)?\\s*$/i);
+      const isPerfectScore = scoreMatch !== null && Number(scoreMatch[1]) === 100;
+      if (isPerfectScore) {
+        const evidence = strengths || auditNotes;
+        const strengthText = evidence
+          ? evidence.split(/\\n+/).map((line) => line.trim()).filter(Boolean).map((line) => "- " + line.replace(/^[-•*]\\s*/, "")).join("\\n")
+          : "- QA audit score: 100/100, demonstrating that the audited call met all scored QA criteria.";
+        const discussionFeedback = `Performance Assessment
+Strengths:
+${strengthText}
+
+Areas for Improvement:
+None identified in this QA audit. The trainee achieved a perfect score of 100/100.
+
+SMART Coaching Discussion
+${traineeName}, congratulations on achieving a perfect QA score of 100/100. What is your SMART action plan for maintaining this level of performance and consistently applying the practices that contributed to this result?
+
+Please consider:
+- Specific: Which successful practices will you continue using on every call?
+- Measurable: How will you monitor and maintain your QA performance?
+- Achievable: What repeatable steps will help you sustain this standard?
+- Relevant: How will these practices continue to support accurate, professional, and complete customer interactions?
+- Time-bound: By when will you review your progress and confirm that the standard is being maintained?
+
+Expected Outcome:
+Sustain excellent call-handling practices, maintain QA performance at the expected standard, and consistently apply the behaviors evidenced by this audit.`;
+        const expectedOutcome = "Sustain the practices demonstrated in this 100/100 audit, continue meeting all scored QA criteria, and maintain consistent quality in future calls.";
+        return response(origin, { discussionFeedback, expectedOutcome, model: "evidence-based-perfect-score-template" });
+      }
       const systemPrompt = "You are Kanako's evidence-based VA coaching assistant. Use only supplied QA/coaching evidence; do not invent behaviors, scores, incidents, causes, or achievements. Keep feedback supportive, specific, professional, non-interrogative, and actionable. Do not make employment decisions or claim certainty beyond the evidence. The VA must create their own SMART action plan, so ask the exact coaching question and provide prompts, but do not write the VA's plan for them. Return valid JSON only with string keys discussion_feedback and expected_outcome.";
       const userPrompt = `Create coaching feedback using this exact structure and headings:
 Performance Assessment
