@@ -1038,20 +1038,26 @@ async function generateAiCoachingFeedback(item){
  if(btn){btn.disabled=true;btn.textContent='Generating feedback…'}
  if(status)status.textContent='Analyzing the supplied QA evidence. This may take a few seconds.';
  try{
-  const result=await cloudRequest('ai-coaching-feedback',{coaching:{traineeName:trainee?.preferred_name||trainee?.full_name||'the VA',sessionDate:$('#fld_session_date')?.value||item?.session_date||'',auditDate:audit?.audit_date||'',auditScore:audit&&audit.score!=null?String(audit.score)+'/'+String(audit.max_score||100):'',strengths,areasForImprovement,auditNotes:[audit?.notes||'',audit?.gaps||''].filter(Boolean).join('\n'),currentSmartPlan:readField('trainee_smart_plan')}});
   const discussion=$('#fld_discussion_notes'),outcome=$('#fld_outcome');
-  let discussionFeedback=String(result.discussionFeedback||'').trim();
-  let expectedOutcome=String(result.expectedOutcome||'').trim();
-  // If the AI includes an Expected Outcome section inside Discussion and Feedback,
-  // move that section into the dedicated Outcome / Follow-up Notes field.
-  const expectedHeading=/^\\s{0,3}(?:#{1,6}\\s*)?(?:\\*\\*)?Expected Outcome(?:\\*\\*)?\\s*:?\\s*(.*)$/im;
-  const expectedMatch=expectedHeading.exec(discussionFeedback);
-  if(expectedMatch){
-   const before=discussionFeedback.slice(0,expectedMatch.index).trim();
-   const afterHeading=discussionFeedback.slice(expectedMatch.index+expectedMatch[0].length).trim();
-   const extracted=[expectedMatch[1]||'',afterHeading].filter(Boolean).join('\\n').trim();
-   if(extracted)expectedOutcome=extracted;
-   discussionFeedback=before.replace(/[\\s\\n]+$/,'');
+  let discussionFeedback='',expectedOutcome='';
+  if(coachingAuditIsPerfect(audit)){
+   const scoreText=String(audit.score??audit.max_score??100)+'/'+String(audit.max_score||100);
+   discussionFeedback='Performance Assessment\nQA Audit Score: '+scoreText+' (Perfect score)\n\nStrengths:\n'+(strengths.trim()||'The linked QA audit achieved a perfect score. Continue demonstrating the same consistent, high-quality performance.')+'\n\nSMART Coaching Discussion\n'+(trainee?.preferred_name||trainee?.full_name||'The VA')+', what SMART action plan will help you sustain this level of performance?\n\nPlease consider:\n- Specific: Which successful habits will you continue?\n- Measurable: How will you monitor consistency in future audits?\n- Achievable: What routine will help you maintain this standard?\n- Relevant: How will these habits continue to support quality service?\n- Time-bound: When will you review your progress?';
+   expectedOutcome='The VA will sustain the demonstrated performance standard, continue applying the successful practices reflected in the perfect QA audit, and verify consistency through subsequent QA reviews.';
+  }else{
+   const result=await cloudRequest('ai-coaching-feedback',{coaching:{traineeName:trainee?.preferred_name||trainee?.full_name||'the VA',sessionDate:$('#fld_session_date')?.value||item?.session_date||'',auditDate:audit?.audit_date||'',auditScore:audit&&audit.score!=null?String(audit.score)+'/'+String(audit.max_score||100):'',strengths,areasForImprovement,auditNotes:[audit?.notes||'',audit?.gaps||''].filter(Boolean).join('\n'),currentSmartPlan:readField('trainee_smart_plan')}});
+   discussionFeedback=String(result.discussionFeedback||'').trim();
+   expectedOutcome=String(result.expectedOutcome||'').trim();
+   // Move an Expected Outcome section into the dedicated Outcome / Follow-up Notes field.
+   const expectedHeading=/^\s{0,3}(?:#{1,6}\s*)?(?:\*\*)?Expected Outcome(?:\*\*)?\s*:?\s*(.*)$/im;
+   const expectedMatch=expectedHeading.exec(discussionFeedback);
+   if(expectedMatch){
+    const before=discussionFeedback.slice(0,expectedMatch.index).trim();
+    const afterHeading=discussionFeedback.slice(expectedMatch.index+expectedMatch[0].length).trim();
+    const extracted=[expectedMatch[1]||'',afterHeading].filter(Boolean).join('\n').trim();
+    if(extracted)expectedOutcome=extracted;
+    discussionFeedback=before.replace(/[\s\n]+$/,'');
+   }
   }
   if(discussion)discussion.value=discussionFeedback;
   if(outcome)outcome.value=expectedOutcome;
