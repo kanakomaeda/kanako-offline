@@ -482,7 +482,7 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
         if (Array.isArray(content)) content = content.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\n");
         if (typeof content !== "string") content = "";
         let parsed: any = null;
-        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\\s*\`\`\`$/, "");
+        const cleaned = content.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
         try { parsed = JSON.parse(cleaned); } catch {
           const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
           if (first >= 0 && last > first) { try { parsed = JSON.parse(cleaned.slice(first, last + 1)); } catch { parsed = null; } }
