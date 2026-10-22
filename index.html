@@ -1092,9 +1092,10 @@ async function generateAiCoachingFeedback(item){
    toast('Coaching feedback ready','AI was unavailable, so a template based only on your supplied evidence was prepared. Review it before saving.');
   }else{
    if(status)status.textContent='AI feedback generated. Review and edit it before saving; the AI used only the supplied coaching/QA details.';
+    toast('AI coaching feedback ready','Review the Discussion and Feedback and Expected Outcome fields, then save the coaching session.');
  
   }
-  toast('AI coaching feedback ready','Review the Discussion and Feedback and Expected Outcome fields, then save the coaching session.');
+  
  }finally{if(btn){btn.disabled=false;btn.textContent='✨ Generate AI Coaching Feedback'}}
 }
 function expectedEndShift(start){
