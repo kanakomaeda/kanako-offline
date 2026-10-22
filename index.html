@@ -1061,8 +1061,8 @@ async function generateAiCoachingFeedback(item){
   }
   if(discussion)discussion.value=discussionFeedback;
   if(outcome)outcome.value=expectedOutcome;
-  if(status)status.textContent='AI feedback generated. Discussion and feedback and Outcome / Follow-up Notes are separated. Review both fields before saving.';
-  toast('AI coaching feedback ready','Expected Outcome is placed in Outcome / Follow-up Notes, separate from Discussion and Feedback. Review both fields, then save the coaching session.');
+  if(status)status.textContent=coachingAuditIsPerfect(audit)?'Perfect-score maintenance feedback prepared locally. No improvement gaps were added. Review both fields before saving.':'AI feedback generated. Discussion and feedback and Outcome / Follow-up Notes are separated. Review both fields before saving.';
+  toast(coachingAuditIsPerfect(audit)?'Perfect-score feedback ready':'AI coaching feedback ready',coachingAuditIsPerfect(audit)?'Maintenance-focused discussion prepared without improvement gaps. Review both fields, then save the coaching session.':'Expected Outcome is placed in Outcome / Follow-up Notes, separate from Discussion and Feedback. Review both fields, then save the coaching session.');
  }finally{if(btn){btn.disabled=false;btn.textContent='✨ Generate AI Coaching Feedback'}}
 }
 function expectedEndShift(start){
