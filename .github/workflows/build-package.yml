@@ -34,10 +34,11 @@ jobs:
           if (!files.length) throw new Error('No app HTML source was found.');
           for (const file of files) {
             const html = fs.readFileSync(file, 'utf8');
-            const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+            const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+              .filter(match => !/type\s*=\s*["']importmap["']/i.test(match[1]));
             if (!scripts.length) throw new Error('No inline JavaScript was found in ' + file + '.');
             scripts.forEach((match, index) => {
-              new Function(match[1]);
+              new Function(match[2]);
               console.log(file + ': JavaScript block ' + (index + 1) + ' parsed successfully.');
             });
           }
