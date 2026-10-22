@@ -386,8 +386,8 @@ async function handler(req: Request) {
 
       // A perfect QA score must not be framed as a performance gap. Use a deterministic
       // maintenance-focused structure so the free model cannot invent deficiencies.
-      const scoreMatch = auditScore.match(/^\\s*(\\d+(?:\\.\\d+)?)\\s*(?:\\/\\s*100|%|points?)?\\s*$/i);
-      const isPerfectScore = scoreMatch !== null && Number(scoreMatch[1]) === 100;
+      const normalizedScore = Number(auditScore.trim().split("/")[0].replace("%", "").replace(/points?/i, "").trim());
+      const isPerfectScore = Number.isFinite(normalizedScore) && normalizedScore === 100;
       if (isPerfectScore) {
         const evidence = strengths || auditNotes;
         const strengthText = evidence
