@@ -551,7 +551,7 @@ async function repairExistingQaAuditDates(){
  }finally{existingQaDateRepairRunning=false}
 }
 
-function processExistingQaPdfs(){
+async function processExistingQaPdfs(){
   if(!currentUser||priorQaPdfScanRunning)return;
   const pending=(data.files||[]).filter(f=>f.pdf_file_id&&!data.audits.some(a=>String(a.source_file_id||'')===String(f.id)||(!!f.source_audit_id&&String(a.id||'')===String(f.source_audit_id))));
   if(!pending.length)return;
