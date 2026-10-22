@@ -514,7 +514,7 @@ function ensureQaCoachingForAvailableEvidence(){
  return created;
 }
 let priorQaPdfScanRunning=false;
-async let existingQaDateRepairRunning=false;
+let existingQaDateRepairRunning=false;
 async function repairExistingQaAuditDates(){
  if(!currentUser||!cloudReady||existingQaDateRepairRunning)return;
  const linked=(data.files||[]).filter(f=>f.pdf_storage_path&&(data.audits||[]).some(a=>String(a.source_file_id||'')===String(f.id)||String(a.id||'')===String(f.source_audit_id)));
