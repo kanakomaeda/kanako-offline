@@ -17,10 +17,10 @@ jobs:
       - name: Locate offline app source
         shell: bash
         run: |
-          if [[ -s index.html ]]; then
-            cp index.html /tmp/kanako-app.html
-          elif [[ -s Kanako_Offline_Workbench.html ]]; then
+          if [[ -s Kanako_Offline_Workbench.html ]]; then
             cp Kanako_Offline_Workbench.html /tmp/kanako-app.html
+          elif [[ -s index.html ]]; then
+            cp index.html /tmp/kanako-app.html
           else
             echo "Upload index.html or Kanako_Offline_Workbench.html to the repository root." >&2
             exit 1
