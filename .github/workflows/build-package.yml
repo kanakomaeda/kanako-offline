@@ -3,6 +3,8 @@ name: Build Kanako Offline Package
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main, security/focus-loss-session-lock]
   workflow_dispatch:
 
 permissions:
@@ -17,26 +19,31 @@ jobs:
       - name: Locate offline app source
         shell: bash
         run: |
-          if [[ -s index.html ]]; then
-            cp index.html /tmp/kanako-app.html
-          elif [[ -s Kanako_Offline_Workbench.html ]]; then
+          if [[ -s Kanako_Offline_Workbench.html ]]; then
             cp Kanako_Offline_Workbench.html /tmp/kanako-app.html
+          elif [[ -s index.html ]]; then
+            cp index.html /tmp/kanako-app.html
           else
             echo "Upload index.html or Kanako_Offline_Workbench.html to the repository root." >&2
             exit 1
           fi
-      - name: Validate embedded JavaScript syntax
+      - name: Validate embedded JavaScript syntax in each app source
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
-          const html = fs.readFileSync('/tmp/kanako-app.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
-          if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
-          scripts.forEach((match, index) => {
-            new Function(match[1]);
-            console.log('JavaScript block ' + (index + 1) + ' parsed successfully.');
-          });
+          const files = ['index.html', 'Kanako_Offline_Workbench.html'].filter(file => fs.existsSync(file));
+          if (!files.length) throw new Error('No app HTML source was found.');
+          for (const file of files) {
+            const html = fs.readFileSync(file, 'utf8');
+            const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+              .filter(match => !/type\s*=\s*["']importmap["']/i.test(match[1]));
+            if (!scripts.length) throw new Error('No inline JavaScript was found in ' + file + '.');
+            scripts.forEach((match, index) => {
+              new Function(match[2]);
+              console.log(file + ': JavaScript block ' + (index + 1) + ' parsed successfully.');
+            });
+          }
           NODE
       - name: Package offline app
         run: |

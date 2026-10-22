@@ -1,10 +1,10 @@
-# Kanako Progress Hub — Offline
+# Kanako Progress Hub — Online and Offline Sources
 
-A standalone, offline-capable version of Kanako Progress Hub.
+This repository contains two distinct app builds: `index.html` is the cloud-connected Kanako Progress Hub used by the Vercel project, while `Kanako_Offline_Workbench.html` is the separate local-first standalone app. They intentionally have different authentication, storage, and feature behavior; do not copy changes between them blindly.
 
 ## One-time setup
 
-Upload the downloaded `Kanako_Offline_Workbench.html` file to the repository root. The GitHub Actions workflow accepts either that filename or `index.html`.
+Keep `Kanako_Offline_Workbench.html` in the repository root. The package workflow prefers this file and uses `index.html` only as a fallback, so the downloadable ZIP stays the standalone offline app.
 
 - Upload page: https://github.com/kanakomaeda/kanako-offline/upload/main
 - After uploading, commit the file to the `main` branch.
@@ -35,21 +35,19 @@ Upload the downloaded `Kanako_Offline_Workbench.html` file to the repository roo
 
 ## Online website (GitHub Pages)
 
-The `.github/workflows/deploy-pages.yml` workflow prepares the app as `index.html` and deploys it to GitHub Pages when the app source or deployment workflow changes on `main`.
+The `.github/workflows/deploy-pages.yml` workflow publishes `Kanako_Offline_Workbench.html` as the GitHub Pages `index.html`. GitHub Pages therefore serves the standalone local-first app, not the Vercel cloud-connected app.
 
 Expected website address:
 `https://kanakomaeda.github.io/kanako-offline/`
 
 GitHub Pages must be available for this repository plan, and the repository's **Settings → Pages → Build and deployment → Source** must be set to **GitHub Actions**. If deployment fails with a Pages configuration or plan error, check those repository settings. GitHub Pages sites are publicly reachable even if the source repository is private; don't publish sensitive information in the static app.
 
-The online version is static hosting only. The login and roles run in the browser; workspace records are saved to local browser storage, and PDFs/MP4s to that browser's IndexedDB. They do not sync to a shared account or database. Admin/Superuser permissions in the current offline app are not a secure server-side access-control system. Do not use this deployment to protect sensitive trainee information or confidential media. Real multi-user access across devices requires a server-backed authentication system and database.
+GitHub Pages is static hosting for the offline Workbench. Its login and roles run in the browser; workspace records are saved to local browser storage, and PDFs/MP4s to that browser's IndexedDB. They do not sync to a shared account or database. Admin/Superuser permissions in this offline app are not a secure server-side access-control system. Do not use this deployment to protect sensitive trainee information or confidential media. For the cloud-connected Vercel app, consult its configured backend and access controls separately.
 
 ## Development workflow
 
-The code committed to this GitHub repository is the development record. Code updates should be committed to this repository and the Actions workflow rebuilds the downloadable package after each push to `main`.
-
-The workflow packages the uploaded standalone HTML. It does not deploy a hosted web app.
+`Kanako_Offline_Workbench.html` is the source for the standalone offline package and GitHub Pages site. `index.html` is the source used by the Vercel cloud-connected app. Keep fixes scoped to the correct build, then intentionally port them only when the behavior should match. The package workflow builds the offline ZIP; the Pages workflow publishes the offline Workbench. Vercel deployments are managed separately.
 
 ## Scope
 
-This is an offline/local-first app. It does not automatically synchronize local records with a cloud database. Any future online sync needs an explicitly configured backend; GitHub repository commits track source code only.
+The Workbench is offline/local-first and does not automatically synchronize records with a cloud database. The Vercel app is a separate cloud-connected build. GitHub commits track source code only; they do not synchronize trainee records or evidence files.
