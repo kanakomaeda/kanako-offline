@@ -411,24 +411,20 @@ function buildPdfRows(items){
   return rows.sort((a,b)=>b.y-a.y).map(row=>{row.cells.sort((a,b)=>a.x-b.x);row.text=row.cells.map(c=>c.text).join(' ').replace(/\s+/g,' ').trim();return row}).filter(r=>r.text);
 }
 function getPdfField(rows,labelPattern){
-  const nextField='Date of Audit|Audit Date|Date Evaluated|Call Week|Audit Week|Week of Audit|Client|Account|VA Name|Trainee Name|Employee Name|Auditor|Evaluator|QA by|FINAL SCORE|Did the VA follow|QA Guidelines|GOAL|SCORE';
+  const nextField='Date of Audit|Audit Date|Date Evaluated|Date|Call Week|Audit Week|Week of Audit|Client|Account|VA Name|Trainee Name|Employee Name|Auditor|Evaluator|QA by|FINAL SCORE|Did the VA follow|QA Guidelines|GOAL|SCORE';
   const rx=new RegExp('(?:'+labelPattern+')\\s*:?\\s*(.*?)(?=\\s+(?:'+nextField+')\\b|\\s+\\d{1,3}(?:\\.\\d+)?\\s*$|$)','i');
   for(let i=0;i<rows.length;i++){
-    const match=rows[i].text.match(rx);
+    const line=String(rows[i].text||'').trim();
+    const match=line.match(rx);
     if(match){const value=String(match[1]||'').trim().replace(/^[|:–—-]+|[|:–—-]+$/g,'').trim();if(value)return value}
-    if(new RegExp('(?:'+labelPattern+')\\s*:?\\s*$','i').test(rows[i].text)){
-      const values=[];
-      for(let j=i+1;j<Math.min(rows.length,i+5);j++){
-        const next=rows[j].text.trim();
+    if(new RegExp('(?:'+labelPattern+')\\s*:?\\s*$','i').test(line)){
+      for(let j=i+1;j<Math.min(rows.length,i+4);j++){
+        const next=String(rows[j].text||'').trim();
         if(!next||new RegExp('^(?:'+nextField+')\\b','i').test(next))continue;
-        const clean=next.replace(/\\s+(?:FINAL SCORE|GOAL|SCORE)\\b.*$/i,'').trim();
-        if(clean)values.push(clean);
+        const dateMatch=next.match(/\\b(?:\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}|\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{4})\\b/);
+        if(dateMatch)return dateMatch[0];
+        if(!/^(?:GOAL|SCORE|FINAL SCORE)\\b/i.test(next))return next;
       }
-      const isClientField=/Client|Account/i.test(labelPattern);
-      const previousIsBlankWeekLabel=i>0&&/^(?:Call Week|Audit Week|Week of Audit)\\s*:?\\s*$/i.test(rows[i-1].text.trim());
-      const preferred=values[isClientField&&previousIsBlankWeekLabel?1:0];
-      if(preferred)return preferred;
-      if(values.length)return values[0];
     }
   }
   return '';
@@ -518,16 +514,16 @@ let existingQaDateRepairRunning=false;
 async function repairExistingQaAuditDates(){
  if(!currentUser||!cloudReady||existingQaDateRepairRunning)return;
  const linked=(data.files||[]).filter(f=>f.pdf_storage_path&&(data.audits||[]).some(a=>String(a.source_file_id||'')===String(f.id)||String(a.id||'')===String(f.source_audit_id)));
- if(!linked.length)return;
+ if(!linked.length){toast('QA Audit date check','No linked cloud QA PDFs were found to check.',true);return}
  existingQaDateRepairRunning=true;
- let corrected=0,unreadable=0;
+ let corrected=0,unreadable=0,unchanged=0;
  try{
   for(const record of linked){
    try{
     const result=await cloudRequest('file-url',{path:record.pdf_storage_path});
     if(!result?.url)throw new Error('PDF URL unavailable');
     const response=await fetch(result.url);
-    if(!response.ok)throw new Error('PDF download failed');
+    if(!response.ok)throw new Error('PDF download failed ('+response.status+')');
     const blob=await response.blob();
     const filename=record.pdf_original_name||'QA-audit.pdf';
     const parsed=await extractAuditPdf(new File([blob],filename,{type:'application/pdf'}));
@@ -535,19 +531,20 @@ async function repairExistingQaAuditDates(){
     const audit=data.audits.find(a=>String(a.source_file_id||'')===String(record.id)||String(a.id||'')===String(record.source_audit_id));
     if(!audit){unreadable++;continue}
     const oldDate=String(audit.audit_date||'');
-    if(oldDate===parsed.audit_date&&String(record.reference_date||'')===parsed.audit_date)continue;
+    if(oldDate===parsed.audit_date&&String(record.reference_date||'')===parsed.audit_date){unchanged++;continue}
     audit.audit_date=parsed.audit_date;
     if(parsed.week_label)audit.week_label=parsed.week_label;
     record.reference_date=parsed.audit_date;
     if(parsed.week_label)record.week_label=parsed.week_label;
     (data.coachings||[]).forEach(c=>{if(String(c.audit_id||c.source_audit_id||'')===String(audit.id)&&String(c.session_date||'')===oldDate)c.session_date=parsed.audit_date});
     corrected++;
-   }catch(err){unreadable++}
+   }catch(err){unreadable++;console.warn('QA PDF date correction failed:',record.pdf_original_name||record.id,err)}
   }
   if(corrected){
-   if(save()){render();toast('QA Audit dates corrected',corrected+' record(s) updated from the date printed in the PDF.'+(unreadable?' '+unreadable+' PDF(s) need manual review.':''));}
-   else toast('Date correction could not save','Export a backup and check browser storage before retrying.',true);
-  }else if(unreadable)toast('Some QA dates need review',unreadable+' PDF(s) could not be read or matched. No guessed dates were applied.',true);
+   if(save()){render();toast('QA Audit dates corrected',corrected+' record(s) updated from the date printed in the PDF.'+(unreadable?' '+unreadable+' PDF(s) need review.':''));}
+   else toast('Date correction could not save','The PDF dates were read, but the changes could not be saved locally.',true);
+  }else if(unreadable)toast('QA Audit dates not corrected',unreadable+' PDF(s) could not be read or matched. '+unchanged+' record(s) already matched. See browser console for the exact PDF error.',true);
+  else toast('QA Audit date check complete',unchanged+' record(s) already match the dates read from their PDFs.');
  }finally{existingQaDateRepairRunning=false}
 }
 
