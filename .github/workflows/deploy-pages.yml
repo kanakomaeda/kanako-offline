@@ -35,7 +35,7 @@ jobs:
           .filter(match => !/type\s*=\s*["']importmap["']/i.test(match[1]));
           if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
           scripts.forEach((match, index) => {
-            new Function(match[1]);
+            new Function(match[2]);
             console.log('JavaScript block ' + (index + 1) + ' parsed successfully.');
           });
           NODE
