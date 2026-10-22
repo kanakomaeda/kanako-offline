@@ -543,7 +543,7 @@ async function processExistingQaPdfs(){
 }
 
 function loadAuthUsers(){try{const u=JSON.parse(localStorage.getItem(AUTH_KEY)||'[]');return Array.isArray(u)?u:[]}catch(e){return []}}
-function saveAuthUsers(){try{localStorage.setItem(AUTH_KEY,JSON.stringify(authUsers));return true}catch(e){toast('Could not save accounts','Browser storage is unavailable or full. Export your workspace backup and try again.',true);return false}}
+
 function isSuperuser(){return !!currentUser&&currentUser.role==='superuser'}function canViewFootprints(){return isSuperuser()}
 function requireSuperuser(action){if(isSuperuser())return true;toast('Permission denied','Only the Superuser can '+(action||'perform this action')+'.',true);return false}
 function makeSalt(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('')}
