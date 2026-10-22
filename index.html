@@ -464,7 +464,7 @@ async function extractAuditPdf(file){
   const pdfjs=await loadPdfJs(),doc=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise,rows=[];
   for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n);rows.push(...buildPdfRows((await page.getTextContent()).items))}
   const text=rows.map(r=>r.text).join('\n');if(text.replace(/\s+/g,' ').trim().length<45)throw new Error('This PDF has no selectable text. It may be scanned or image-only, so enter the audit details manually.');
-  const traineeName=getPdfField(rows,'VA\s*Name|Trainee\s*Name|Employee\s*Name'),dateRaw=getPdfField(rows,'Date\s*of\s*Audit|Audit\s*Date|Date\s*Evaluated'),weekRaw=getPdfField(rows,'Call\s*Week|Audit\s*Week|Week\s*of\s*Audit'),client=getPdfField(rows,'Client|Account'),auditor=getPdfField(rows,'Auditor|Evaluator|QA\s*by');
+  const traineeName=getPdfField(rows,'VA\\s*Name|Trainee\\s*Name|Employee\\s*Name'),dateRaw=getPdfField(rows,'Date\\s*of\\s*Audit|Audit\\s*Date|Date\\s*Evaluated'),weekRaw=getPdfField(rows,'Call\\s*Week|Audit\\s*Week|Week\\s*of\\s*Audit'),client=getPdfField(rows,'Client|Account'),auditor=getPdfField(rows,'Auditor|Evaluator|QA\\s*by');
   const auditDate=pdfDateToISO(dateRaw),weekLabel=parseAuditWeek(weekRaw,file.name,auditDate),candidates=[];
   for(const row of rows){const re=/\b100\s+(\d{1,3}(?:\.\d+)?)\b/g;let match;while((match=re.exec(row.text))!==null)candidates.push(Number(match[1]))}
   let score=candidates.length?candidates[candidates.length-1]:null;
