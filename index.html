@@ -1087,7 +1087,13 @@ async function generateAiCoachingFeedback(item){
   const discussion=$('#fld_discussion_notes'),outcome=$('#fld_outcome');
   if(discussion)discussion.value=result.discussionFeedback;
   if(outcome)outcome.value=result.expectedOutcome;
-  if(status)status.textContent='AI feedback generated. Review and edit it before saving; the AI used only the supplied coaching/QA details.';
+  if(result.fallback){
+   if(status)status.textContent='AI provider timed out or was unavailable. An evidence-based template was prepared from the supplied notes; review and edit it before saving.';
+   toast('Coaching feedback ready','AI was unavailable, so a template based only on your supplied evidence was prepared. Review it before saving.');
+  }else{
+   if(status)status.textContent='AI feedback generated. Review and edit it before saving; the AI used only the supplied coaching/QA details.';
+ 
+  }
   toast('AI coaching feedback ready','Review the Discussion and Feedback and Expected Outcome fields, then save the coaching session.');
  }finally{if(btn){btn.disabled=false;btn.textContent='✨ Generate AI Coaching Feedback'}}
 }
