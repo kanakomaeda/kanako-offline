@@ -384,6 +384,34 @@ async function handler(req: Request) {
       const auditDate = String(input.auditDate || "").slice(0, 40);
       const sessionDate = String(input.sessionDate || "").slice(0, 40);
       const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
+      const scoreFraction = auditScore.match(/(\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)/);
+      const scorePercent = auditScore.match(/(\\d+(?:\\.\\d+)?)\\s*%/);
+      const perfectScore = scoreFraction
+        ? Number(scoreFraction[2]) > 0 && Number(scoreFraction[1]) >= Number(scoreFraction[2])
+        : !!scorePercent && Number(scorePercent[1]) >= 100;
+      if (perfectScore) {
+        const strengthsText = strengths || "The linked QA audit achieved a perfect score. Continue demonstrating the same consistent, high-quality performance.";
+        return response(origin, {
+          discussionFeedback: `Performance Assessment
+QA Audit Score: ${auditScore} (Perfect score)
+
+Strengths:
+${strengthsText}
+
+SMART Coaching Discussion
+${traineeName}, what SMART action plan will help you sustain this level of performance?
+
+Please consider:
+- Specific: Which successful habits will you continue?
+- Measurable: How will you monitor consistency in future audits?
+- Achievable: What routine will help you maintain this standard?
+- Relevant: How will these habits continue to support quality service?
+- Time-bound: When will you review your progress?`,
+          expectedOutcome: "The VA will sustain the demonstrated performance standard, continue applying the successful practices reflected in the perfect QA audit, and verify consistency through subsequent QA reviews.",
+          model: "perfect-score-maintenance",
+          fallback: true
+        });
+      }
       if (!strengths && !improvements && !auditNotes) return response(origin, { error: "Add Strengths / Wins, Areas for Improvement, or linked QA findings before generating feedback." }, 400);
       const asBullets = (value: string) => {
         const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
