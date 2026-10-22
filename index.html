@@ -514,7 +514,44 @@ function ensureQaCoachingForAvailableEvidence(){
  return created;
 }
 let priorQaPdfScanRunning=false;
-async function processExistingQaPdfs(){
+async let existingQaDateRepairRunning=false;
+async function repairExistingQaAuditDates(){
+ if(!currentUser||!cloudReady||existingQaDateRepairRunning)return;
+ const linked=(data.files||[]).filter(f=>f.pdf_storage_path&&(data.audits||[]).some(a=>String(a.source_file_id||'')===String(f.id)||String(a.id||'')===String(f.source_audit_id)));
+ if(!linked.length)return;
+ existingQaDateRepairRunning=true;
+ let corrected=0,unreadable=0;
+ try{
+  for(const record of linked){
+   try{
+    const result=await cloudRequest('file-url',{path:record.pdf_storage_path});
+    if(!result?.url)throw new Error('PDF URL unavailable');
+    const response=await fetch(result.url);
+    if(!response.ok)throw new Error('PDF download failed');
+    const blob=await response.blob();
+    const filename=record.pdf_original_name||'QA-audit.pdf';
+    const parsed=await extractAuditPdf(new File([blob],filename,{type:'application/pdf'}));
+    if(!parsed.audit_date){unreadable++;continue}
+    const audit=data.audits.find(a=>String(a.source_file_id||'')===String(record.id)||String(a.id||'')===String(record.source_audit_id));
+    if(!audit){unreadable++;continue}
+    const oldDate=String(audit.audit_date||'');
+    if(oldDate===parsed.audit_date&&String(record.reference_date||'')===parsed.audit_date)continue;
+    audit.audit_date=parsed.audit_date;
+    if(parsed.week_label)audit.week_label=parsed.week_label;
+    record.reference_date=parsed.audit_date;
+    if(parsed.week_label)record.week_label=parsed.week_label;
+    (data.coachings||[]).forEach(c=>{if(String(c.audit_id||c.source_audit_id||'')===String(audit.id)&&String(c.session_date||'')===oldDate)c.session_date=parsed.audit_date});
+    corrected++;
+   }catch(err){unreadable++}
+  }
+  if(corrected){
+   if(save()){render();toast('QA Audit dates corrected',corrected+' record(s) updated from the date printed in the PDF.'+(unreadable?' '+unreadable+' PDF(s) need manual review.':''));}
+   else toast('Date correction could not save','Export a backup and check browser storage before retrying.',true);
+  }else if(unreadable)toast('Some QA dates need review',unreadable+' PDF(s) could not be read or matched. No guessed dates were applied.',true);
+ }finally{existingQaDateRepairRunning=false}
+}
+
+function processExistingQaPdfs(){
   if(!currentUser||priorQaPdfScanRunning)return;
   const pending=(data.files||[]).filter(f=>f.pdf_file_id&&!data.audits.some(a=>String(a.source_file_id||'')===String(f.id)||(!!f.source_audit_id&&String(a.id||'')===String(f.source_audit_id))));
   if(!pending.length)return;
@@ -606,7 +643,7 @@ function updateSessionWatermark(){
 async function enterApp(user){
  currentUser=user;deviceBindingExempt=String(user?.role||'').trim().toLowerCase()==='superuser';if(screenWatermarkTimer)clearInterval(screenWatermarkTimer);screenWatermarkTimer=null;updateSessionWatermark();if(!deviceBindingExempt)screenWatermarkTimer=setInterval(updateSessionWatermark,15000);if(deviceBindingExempt){const onboardingBackdrop=$('#onboardingVideoBackdrop'),onboardingVideo=$('#requiredOnboardingVideo');onboardingBackdrop?.classList.add('hidden');if(onboardingVideo)onboardingVideo.pause();document.body.style.overflow='';}authUsers=[];deviceRequests=[];$('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');$('#sessionRoleChip').textContent=isSuperuser()?'SUPERUSER':'ADMIN';$('#userNav').classList.toggle('hidden',!isSuperuser());$('#logsNav').classList.toggle('hidden',!isSuperuser());$('#footprintsNav')?.classList.toggle('hidden',!canViewFootprints());$('#importBtn').classList.toggle('hidden',!isSuperuser());$('#clearSystemLogs').classList.toggle('hidden',!isSuperuser());$('#exportBtn').classList.toggle('hidden',!isSuperuser());$('#dashboardView h1').textContent='Good day, '+(user.displayName||user.username||'Trainer')+'.';
  try{if(isSuperuser()){const u=await cloudRequest('users-list');authUsers=u.users||[];await loadDeviceRequests();await loadUnlockRequests()}await initializeCloudWorkspace()}catch(err){cloudReady=false;cloudSyncStatus='error';toast('Cloud sync unavailable',err.message||'The app is open, but shared records could not be loaded.',true)}
- switchView('dashboard');render();showRequiredOnboardingVideo();if(deviceBindingExempt||isSuperuser()){const orientation=$('#onboardingVideoBackdrop'),orientationVideo=$('#requiredOnboardingVideo');orientation?.classList.add('hidden');orientation?.setAttribute('aria-hidden','true');orientationVideo?.pause();document.body.style.overflow='';}if(cloudReady){processExistingQaPdfs();if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>syncCloudNow().catch(()=>{}),10000)}
+ switchView('dashboard');render();showRequiredOnboardingVideo();if(deviceBindingExempt||isSuperuser()){const orientation=$('#onboardingVideoBackdrop'),orientationVideo=$('#requiredOnboardingVideo');orientation?.classList.add('hidden');orientation?.setAttribute('aria-hidden','true');orientationVideo?.pause();document.body.style.overflow='';}if(cloudReady){processExistingQaPdfs();void repairExistingQaAuditDates();if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>syncCloudNow().catch(()=>{}),10000)}
 }
 async function logout(skipRemote=false){const remoteLogout=!skipRemote&&cloudToken?cloudRequest('logout',{}).catch(()=>{}):Promise.resolve();deviceBindingExempt=false;if(screenWatermarkTimer)clearInterval(screenWatermarkTimer);screenWatermarkTimer=null;const watermark=$('#sessionWatermark');if(watermark){watermark.replaceChildren();delete watermark.dataset.label}cloudToken='';localStorage.removeItem(CLOUD_TOKEN_KEY);currentUser=null;cloudReady=false;cloudSyncStatus='offline';cloudBaseline={};if(cloudPollTimer)clearInterval(cloudPollTimer);if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(footprintPollTimer)clearInterval(footprintPollTimer);cloudPollTimer=null;cloudSyncTimer=null;footprintPollTimer=null;modal=null;$('#modalBackdrop').classList.add('hidden');$('#importBackdrop').classList.add('hidden');$('#passwordBackdrop').classList.add('hidden');$('#adminResetBackdrop').classList.add('hidden');$('#appShell').classList.add('hidden');$('#authScreen').classList.remove('hidden');await renderAuthScreen();await remoteLogout}
 function showPasswordDialog(){if(!currentUser)return;$('#passwordForm').reset();$('#passwordMessage').textContent='';$('#passwordMessage').classList.add('hidden');$('#passwordBackdrop').classList.remove('hidden')}
