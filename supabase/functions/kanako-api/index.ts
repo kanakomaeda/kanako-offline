@@ -425,12 +425,21 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
           ]
         };
         if (useJsonMode) payload.response_format = { type: "json_object" };
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(45000)
-        });
+        let res: Response;
+        try {
+          res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json", "HTTP-Referer": "https://kanako-progress-hub.vercel.app", "X-Title": "Kanako Coaching Tracker" },
+            body: JSON.stringify(payload),
+            // Keep each attempt bounded so a slow free route does not consume the whole Edge Function request.
+            signal: AbortSignal.timeout(25000)
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err || "");
+          const isTimeout = (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) || /timed?\s*out|timeout|aborted/i.test(message);
+          console.warn("OpenRouter coaching request interrupted.", { timeout: isTimeout, message: message.slice(0, 180) });
+          return { ok: false as const, status: isTimeout ? 408 : 0 };
+        }
         if (!res.ok) {
           const detail = (await res.text()).slice(0, 500);
           console.error("OpenRouter coaching request failed:", res.status, detail);
@@ -452,9 +461,15 @@ Use concise bullets for strengths and improvement areas, preserving the trainer'
         return { ok: true as const, parsed, discussion, outcome, model: json?.model || "openrouter/free", finishReason: json?.choices?.[0]?.finish_reason || "", contentLength: cleaned.length };
       }
       let attempt = await requestCoaching(true);
+      // If the free route stalls, retry once in compatibility mode within a bounded total wait.
+      if (!attempt.ok && attempt.status === 408) {
+        console.warn("OpenRouter coaching timed out on the first attempt; retrying once in compatibility mode.");
+        attempt = await requestCoaching(false);
+      }
       if (!attempt.ok) {
         if (attempt.status === 401) return response(origin, { error: "OpenRouter rejected the API key. Check the OPENROUTER_API_KEY secret." }, 502);
         if (attempt.status === 429) return response(origin, { error: "The free AI request limit has been reached. Please try again later." }, 429);
+        if (attempt.status === 408) return response(origin, { error: "The free AI model took too long to respond. No coaching data was saved. Please try again shortly." }, 504);
         return response(origin, { error: "OpenRouter could not generate feedback right now. Please try again shortly." }, 502);
       }
       if (!attempt.discussion || !attempt.outcome) {
