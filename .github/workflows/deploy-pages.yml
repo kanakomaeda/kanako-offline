@@ -31,7 +31,8 @@ jobs:
           node - <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('Kanako_Offline_Workbench.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+  .filter(match => !/type\s*=\s*["']importmap["']/i.test(match[1]));
           if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
           scripts.forEach((match, index) => {
             new Function(match[1]);
