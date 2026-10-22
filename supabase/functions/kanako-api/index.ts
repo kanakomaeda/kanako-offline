@@ -384,8 +384,8 @@ async function handler(req: Request) {
       const auditDate = String(input.auditDate || "").slice(0, 40);
       const sessionDate = String(input.sessionDate || "").slice(0, 40);
       const existingPlan = String(input.currentSmartPlan || "").trim().slice(0, 2500);
-      const scoreFraction = auditScore.match(/(\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)/);
-      const scorePercent = auditScore.match(/(\\d+(?:\\.\\d+)?)\\s*%/);
+      const scoreFraction = auditScore.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+      const scorePercent = auditScore.match(/(\d+(?:\.\d+)?)\s*%/);
       const perfectScore = scoreFraction
         ? Number(scoreFraction[2]) > 0 && Number(scoreFraction[1]) >= Number(scoreFraction[2])
         : !!scorePercent && Number(scorePercent[1]) >= 100;
