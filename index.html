@@ -1040,10 +1040,23 @@ async function generateAiCoachingFeedback(item){
  try{
   const result=await cloudRequest('ai-coaching-feedback',{coaching:{traineeName:trainee?.preferred_name||trainee?.full_name||'the VA',sessionDate:$('#fld_session_date')?.value||item?.session_date||'',auditDate:audit?.audit_date||'',auditScore:audit&&audit.score!=null?String(audit.score)+'/'+String(audit.max_score||100):'',strengths,areasForImprovement,auditNotes:[audit?.notes||'',audit?.gaps||''].filter(Boolean).join('\n'),currentSmartPlan:readField('trainee_smart_plan')}});
   const discussion=$('#fld_discussion_notes'),outcome=$('#fld_outcome');
-  if(discussion)discussion.value=result.discussionFeedback;
-  if(outcome)outcome.value=result.expectedOutcome;
-  if(status)status.textContent='AI feedback generated. Review and edit it before saving; the AI used only the supplied coaching/QA details.';
-  toast('AI coaching feedback ready','Review the Discussion and Feedback and Expected Outcome fields, then save the coaching session.');
+  let discussionFeedback=String(result.discussionFeedback||'').trim();
+  let expectedOutcome=String(result.expectedOutcome||'').trim();
+  // If the AI includes an Expected Outcome section inside Discussion and Feedback,
+  // move that section into the dedicated Outcome / Follow-up Notes field.
+  const expectedHeading=/^\\s{0,3}(?:#{1,6}\\s*)?(?:\\*\\*)?Expected Outcome(?:\\*\\*)?\\s*:?\\s*(.*)$/im;
+  const expectedMatch=expectedHeading.exec(discussionFeedback);
+  if(expectedMatch){
+   const before=discussionFeedback.slice(0,expectedMatch.index).trim();
+   const afterHeading=discussionFeedback.slice(expectedMatch.index+expectedMatch[0].length).trim();
+   const extracted=[expectedMatch[1]||'',afterHeading].filter(Boolean).join('\\n').trim();
+   if(extracted)expectedOutcome=extracted;
+   discussionFeedback=before.replace(/[\\s\\n]+$/,'');
+  }
+  if(discussion)discussion.value=discussionFeedback;
+  if(outcome)outcome.value=expectedOutcome;
+  if(status)status.textContent='AI feedback generated. Discussion and feedback and Outcome / Follow-up Notes are separated. Review both fields before saving.';
+  toast('AI coaching feedback ready','Expected Outcome is placed in Outcome / Follow-up Notes, separate from Discussion and Feedback. Review both fields, then save the coaching session.');
  }finally{if(btn){btn.disabled=false;btn.textContent='✨ Generate AI Coaching Feedback'}}
 }
 function expectedEndShift(start){
