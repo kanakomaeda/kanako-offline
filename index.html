@@ -548,7 +548,7 @@ async function repairExistingQaAuditDates(){
    if(save()){render();toast('QA Audit dates corrected',corrected+' record(s) updated from the date printed in the PDF.'+(unreadable?' '+unreadable+' PDF(s) need review.':''));}
    else toast('Date correction could not save','The PDF dates were read, but the changes could not be saved locally.',true);
   }else if(unreadable)toast('QA Audit dates not corrected',unreadable+' PDF(s) could not be read or matched. '+unchanged+' record(s) already matched. See browser console for the exact PDF error.',true);
-  else toast('QA Audit date check complete',unchanged+' record(s) already match the dates read from their PDFs.');
+  // Silent when every linked PDF date already matches; avoid repeating this notice on each login.
  }finally{existingQaDateRepairRunning=false}
 }
 
