@@ -827,7 +827,7 @@ function renderImprovementVerification(reset=false){
  const oldT=traineeEl.value,oldB=baselineEl.value,oldF=followupEl.value;
  const traineeIds=[...new Set((data.audits||[]).filter(a=>a.trainee_id&&a.audit_date&&a.score!==null&&a.score!==undefined&&a.score!=='').map(a=>String(a.trainee_id)))];
  traineeEl.innerHTML='<option value="">Select trainee</option>'+traineeIds.map(id=>'<option value="'+esc(id)+'">'+esc(person(id))+'</option>').join('');
- traineeEl.value=!reset&&traineeIds.includes(oldT)?oldT:'';
+ traineeEl.value=traineeIds.includes(oldT)?oldT:'';
  const tid=traineeEl.value;
  const audits=(data.audits||[]).filter(a=>String(a.trainee_id)===tid&&a.audit_date&&a.score!==null&&a.score!==undefined&&a.score!=='').sort((a,b)=>String(a.audit_date).localeCompare(String(b.audit_date))||String(a.id).localeCompare(String(b.id)));
  const auditLabel=a=>date(a.audit_date)+' · '+String(a.score)+'/'+String(a.max_score||100)+(a.client_name?' · '+a.client_name:'');
