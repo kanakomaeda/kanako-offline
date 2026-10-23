@@ -1034,7 +1034,7 @@ async function generateAiCoachingFeedback(item){
  const audit=data.audits.find(a=>String(a.id)===String(auditId));
  const readField=name=>{const el=$('#fld_'+name);if(!el)return String(item?.[name]||'');if(name==='strengths'||name==='focus_areas'){const preview=$('#preview_'+name);if(preview)return [...preview.querySelectorAll('li')].map(li=>li.innerText.trim()).filter(Boolean).join('\n')||preview.innerText.trim()}return String(el.value||'')};
  const strengths=readField('strengths'),areasForImprovement=readField('focus_areas');
- if(!strengths.trim()&&!areasForImprovement.trim()&&!audit?.notes&&!audit?.gaps)throw new Error('Add Strengths / Wins, Areas for Improvement, or link a QA audit with findings first.');
+ if(!coachingAuditIsPerfect(audit)&&!strengths.trim()&&!areasForImprovement.trim()&&!audit?.notes&&!audit?.gaps)throw new Error('Add Strengths / Wins, Areas for Improvement, or link a QA audit with findings first.');
  if(btn){btn.disabled=true;btn.textContent='Generating feedback…'}
  if(status)status.textContent='Analyzing the supplied QA evidence. This may take a few seconds.';
  try{
