@@ -845,7 +845,7 @@ function renderImprovementVerification(reset=false){
   resultEl.innerHTML='<div class="empty-state"><div class="empty-icon">↗</div><strong>Choose audits in date order</strong>The baseline must be earlier than the follow-up audit. Select two different audits.</div>';saveBtn.disabled=true;if(hint)hint.textContent='Select an earlier baseline and a later follow-up audit.';return
  }
  const pct=x=>Number(x.score)/(Number(x.max_score)||100)*100;
- const delta=pct(b)-pct(a),fmt=x=>x.toFixed(1)+'%',deltaLabel=(delta>0?'+':'')+delta.toFixed(1)+' percentage points';
+ const delta=pct(b)-pct(a),fmt=x=>x.toFixed(1)+'%';
  const outcome=delta>0?'Improving':'Not Improving';
  const passThreshold=80,followupMeetsPassing=pct(b)>=passThreshold;
  const description='The normalized QA score '+(delta>0?'increased by '+delta.toFixed(1)+' percentage points.':delta<0?'decreased by '+Math.abs(delta).toFixed(1)+' percentage points.':'did not change.')+' Follow-up result: '+(followupMeetsPassing?'meets':'does not meet')+' the '+passThreshold+'% passing threshold.';
