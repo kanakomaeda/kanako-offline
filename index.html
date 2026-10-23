@@ -846,11 +846,6 @@ function renderImprovementVerification(reset=false){
  }
  const pct=x=>Number(x.score)/(Number(x.max_score)||100)*100;
  const delta=pct(b)-pct(a),fmt=x=>x.toFixed(1)+'%',deltaLabel=(delta>0?'+':'')+delta.toFixed(1)+' percentage points';
- const lines=v=>String(v||'').split(/\r?\n/).map(x=>x.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
- const baseG=lines(a.gaps),followG=lines(b.gaps),key=x=>x.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
- const persistent=followG.filter(x=>baseG.some(y=>key(y)===key(x)));
- const resolved=baseG.filter(x=>!followG.some(y=>key(y)===key(x)));
- const newGaps=followG.filter(x=>!baseG.some(y=>key(y)===key(x)));
  const outcome=delta>0?'Improving':'Not Improving';
  const passThreshold=80,followupMeetsPassing=pct(b)>=passThreshold;
  const description='The normalized QA score '+(delta>0?'increased by '+delta.toFixed(1)+' percentage points.':delta<0?'decreased by '+Math.abs(delta).toFixed(1)+' percentage points.':'did not change.')+' Follow-up result: '+(followupMeetsPassing?'meets':'does not meet')+' the '+passThreshold+'% passing threshold.';
@@ -866,8 +861,6 @@ function saveImprovementVerification(){
  if(!a||!b||String(a.trainee_id)!==String(b.trainee_id)||String(a.audit_date)>=String(b.audit_date)){toast('Cannot save verification','Choose a valid baseline and a later follow-up audit for the same trainee.',true);return}
  const delta=Number(btn.dataset.delta),outcome=btn.dataset.outcome,now=new Date().toISOString(),notes=$('#verificationNotes')?.value.trim()||'';
  const pct=x=>Number(x.score)/(Number(x.max_score)||100)*100;
- const lines=v=>String(v||'').split(/\r?\n/).map(x=>x.trim().replace(/^[-•*]\s*/, '')).filter(Boolean),key=x=>x.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
- const baseG=lines(a.gaps),followG=lines(b.gaps),persistent=followG.filter(x=>baseG.some(y=>key(y)===key(x))),resolved=baseG.filter(x=>!followG.some(y=>key(y)===key(x))),newGaps=followG.filter(x=>!baseG.some(y=>key(y)===key(x)));
  const passThreshold=80,followupMeetsPassing=pct(b)>=passThreshold;
  const summary='Baseline '+date(a.audit_date)+': '+Number(pct(a)).toFixed(1)+'%; follow-up '+date(b.audit_date)+': '+Number(pct(b)).toFixed(1)+'%; change '+(delta>0?'+':'')+delta.toFixed(1)+' percentage points. Status: '+outcome+'. Follow-up '+(followupMeetsPassing?'meets':'does not meet')+' the '+passThreshold+'% passing threshold.'+(notes?' Trainer notes: '+notes:'');
  b.verification_baseline_audit_id=String(a.id);b.verification_status=outcome;b.verification_delta=Number(delta.toFixed(2));b.verification_date=now.slice(0,10);b.verification_notes=notes;b.verification_summary=summary;b.updated_at=now;
