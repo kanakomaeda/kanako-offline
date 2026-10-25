@@ -265,6 +265,39 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
 .metric-foot,.quick-action small,.sidebar-bottom p{font-size:10px;line-height:1.65}
 .search-box input,.filter-bar input,.filter-bar select{min-height:38px}
 @media(max-width:760px){.main{padding-left:16px;padding-right:16px}.topbar{gap:8px}.breadcrumb{font-size:10px}.today-chip{display:none}.page-heading{align-items:flex-start;flex-direction:column}.heading-actions{width:100%}.heading-actions .btn{flex:1}.verify-grid,.verify-score-grid,.verification-gap-columns{grid-template-columns:1fr}.filter-bar{gap:8px}.filter-bar .search-box{width:100%;max-width:none}}
+
+/* Comprehensive dashboard UX: clear workflow hierarchy, fewer competing CTAs, and responsive cards. */
+.dashboard-welcome{margin-bottom:20px;padding:4px 0 0}
+.dashboard-welcome h1{font-size:clamp(25px,3vw,34px);letter-spacing:-1.15px;margin:7px 0 8px}
+.dashboard-welcome p{max-width:660px;font-size:13px;line-height:1.7}
+.workflow-hub{margin:0 0 22px;padding:22px;border:1px solid var(--line,#e7edf5);border-radius:16px;background:linear-gradient(120deg,var(--surface,#fff) 0%,var(--blue-soft,#eef2ff) 100%);box-shadow:var(--shadow,0 6px 24px #182d4a08)}
+.workflow-hub-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:17px}
+.workflow-hub-heading h2{font-size:16px;letter-spacing:-.35px;margin:5px 0}
+.workflow-hub-heading p{font-size:11px;color:var(--muted,#8491a4);line-height:1.65;margin:0}
+.workflow-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.workflow-step{display:flex;align-items:flex-start;gap:10px;min-width:0;min-height:92px;padding:14px 12px;text-align:left;border:1px solid var(--line,#e7edf5);border-radius:11px;background:var(--surface,#fff);color:var(--ink,#1d2a3d);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.workflow-step:hover{transform:translateY(-2px);border-color:#aab8ff;box-shadow:0 8px 20px #344b9c12}
+.workflow-step-number{display:grid;place-items:center;flex:0 0 29px;height:29px;border-radius:9px;background:var(--blue-soft,#eef2ff);color:var(--blue,#4f6bed);font-size:10px;font-weight:850}
+.workflow-step-copy{display:grid;gap:5px;min-width:0;padding-top:1px}
+.workflow-step-copy strong{font-size:11px;line-height:1.4;font-weight:800}
+.workflow-step-copy small{font-size:10px;line-height:1.5;color:var(--muted,#8491a4)}
+.workflow-step-arrow{margin-left:auto;color:var(--blue,#4f6bed);font-size:15px;line-height:1}
+.dashboard-grid{align-items:stretch}
+.metric-card{transition:box-shadow .16s ease,border-color .16s ease}
+.metric-card:hover{border-color:#d5ddf4;box-shadow:0 8px 24px #182d4a0d}
+.panel-heading{min-height:67px}
+.nav-link{gap:10px}
+.nav-link.active{box-shadow:inset 3px 0 0 #91a1ff}
+.nav-more summary{padding-top:11px;padding-bottom:11px}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #8095ff;outline-offset:3px}
+@media(max-width:1100px){.workflow-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.workflow-hub{padding:15px;border-radius:13px}.workflow-hub-heading{margin-bottom:12px}.workflow-steps{grid-template-columns:1fr;gap:8px}.workflow-step{min-height:0;padding:12px}.workflow-step-copy{flex:1}.dashboard-welcome h1{font-size:26px}.dashboard-welcome p{font-size:12px}.metric-card{padding:13px}.metric-value{font-size:26px}}
+body[data-theme="dark"] .workflow-hub{background:linear-gradient(120deg,#111c30,#18243c);border-color:#293850}
+body[data-theme="dark"] .workflow-step{background:#111c30;border-color:#293850;color:#edf3ff}
+body[data-theme="dark"] .workflow-step:hover{border-color:#6679f6}
+body[data-theme="cyberpunk"] .workflow-hub{background:linear-gradient(120deg,#120d20,#211232);border-color:#3b2055}
+body[data-theme="cyberpunk"] .workflow-step{background:#150e25;border-color:#3b2055;color:#fff5ff}
+body[data-theme="cyberpunk"] .workflow-step:hover{border-color:#bd7aff}
 </style>
 </head>
 <body data-theme="light">
@@ -291,11 +324,11 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
       <button class="nav-link active" data-view="dashboard"><span class="nav-icon">⌂</span>Home</button>
       <button class="nav-link" data-view="trainees"><span class="nav-icon">♙</span>Trainees <span class="nav-count" id="navTrainees">0</span></button>
       <button class="nav-link" data-view="audits"><span class="nav-icon">✓</span>QA Audits</button>
-      <button class="nav-link" data-view="coaching"><span class="nav-icon">◷</span>Coaching &amp; SMART Plans <span class="nav-count warning" id="navCoaching">0</span></button>
+      <button class="nav-link" data-view="coaching"><span class="nav-icon">◷</span>Coaching Tracker <span class="nav-count warning" id="navCoaching">0</span></button>
       <button class="nav-link" data-view="reports"><span class="nav-icon">▤</span>Weekly Reports</button>
     </nav>
     <details class="nav-more" id="navMore">
-      <summary><span class="nav-icon">＋</span>More tools</summary>
+      <summary><span class="nav-icon">＋</span>Records &amp; resources</summary>
       <nav class="nav-list" aria-label="More tools">
         <button class="nav-link" data-view="ir_nte"><span class="nav-icon">⚑</span>IR &amp; NTE Records</button>
         <button class="nav-link" data-view="files"><span class="nav-icon">▣</span>QA Evidence Library</button>
@@ -317,7 +350,16 @@ html,body{height:auto;min-height:100%;overflow-y:auto!important}
     <header class="topbar"><button class="mobile-menu" id="mobileMenu" aria-label="Toggle navigation" title="Hide or show navigation" aria-expanded="true">☰</button><div class="breadcrumb"><span>Kanako Progress Hub</span><b>/</b><strong id="breadcrumbTitle">Dashboard</strong></div><div class="topbar-actions"><label class="theme-control" for="themeSelect"><span class="theme-control-icon">◐</span><select id="themeSelect" aria-label="Choose appearance theme"><option value="light">☀ Light</option><option value="dark">☾ Dark</option><option value="cyberpunk">✦ Cyberpunk</option></select></label><span class="role-chip" id="sessionRoleChip">LOGIN REQUIRED</span><button type="button" class="btn btn-outline" id="accountBtn">Password</button><button type="button" class="btn btn-outline" id="logoutBtn">Log out</button><span class="today-chip" id="todayChip"></span><button class="btn btn-primary" id="topAction" data-action="add-trainee">＋ Add trainee</button></div></header>
     <section class="sync-status offline" id="syncStatus" aria-live="polite"><span class="sync-status-dot"></span><div class="sync-status-copy"><strong id="syncTitle">Checking save status…</strong><span id="syncLabel">Checking whether changes are saved to the shared workspace.</span></div><span class="sync-pending-count" id="pendingCount">CHECKING</span><details class="sync-details"><summary>Details &amp; backups</summary><div class="sync-details-content"><div class="storage-indicators" id="storageIndicators" aria-live="polite"><span class="storage-indicator">Records: checking cloud status…</span><span class="storage-indicator">Attachments: checking cloud status…</span></div><div class="sync-backup-actions"><button type="button" class="btn btn-outline" id="importBtn">Restore backup</button><button type="button" class="btn btn-outline" id="exportBtn">Export full backup</button></div></div></details></section>
     <section class="page" id="dashboardView">
-      <div class="page-heading"><div><div class="eyebrow">OVERVIEW</div><h1>Good day, Trainer.</h1><p>Your training progress at a glance.</p></div><div class="heading-actions"><button class="btn btn-outline" data-go="reports">＋ Weekly report</button></div></div>
+      <div class="page-heading dashboard-welcome"><div><div class="eyebrow">TRAINING WORKSPACE</div><h1>Your training overview</h1><p>Track performance, coach with evidence, and verify improvement from one place.</p></div></div>
+      <section class="workflow-hub" aria-label="Training workflow">
+        <div class="workflow-hub-heading"><div><span class="eyebrow">RECOMMENDED WORKFLOW</span><h2>Move each trainee forward</h2><p>Follow the same sequence to keep audits, coaching, and outcomes connected.</p></div></div>
+        <div class="workflow-steps">
+          <button type="button" class="workflow-step" data-action="add-audit"><span class="workflow-step-number">01</span><span class="workflow-step-copy"><strong>Record QA audit</strong><small>Capture score and evidence</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="workflow-step" data-action="add-coaching"><span class="workflow-step-number">02</span><span class="workflow-step-copy"><strong>Coach the gap</strong><small>Agree on a SMART action</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="workflow-step" data-go="coaching"><span class="workflow-step-number">03</span><span class="workflow-step-copy"><strong>Follow up</strong><small>Review due sessions</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="workflow-step" data-go="audits"><span class="workflow-step-number">04</span><span class="workflow-step-copy"><strong>Verify improvement</strong><small>Compare baseline and follow-up</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
+        </div>
+      </section>
       <div class="metric-grid"><article class="metric-card"><div class="metric-top"><span>Active trainees</span><span class="metric-icon blue">♙</span></div><div class="metric-value" id="metricTrainees">0</div><div class="metric-foot" id="metricTraineesFoot">No trainee records yet</div></article><article class="metric-card"><div class="metric-top"><span>QA audits logged</span><span class="metric-icon purple">✓</span></div><div class="metric-value" id="metricAudits">0</div><div class="metric-foot">Across all trainee records</div></article><article class="metric-card"><div class="metric-top"><span>Coaching to complete</span><span class="metric-icon amber">◷</span></div><div class="metric-value" id="metricCoaching">0</div><div class="metric-foot" id="metricCoachingFoot">Generated from QA audits</div></article><article class="metric-card"><div class="metric-top"><span>Weekly reports</span><span class="metric-icon green">▤</span></div><div class="metric-value" id="metricReports">0</div><div class="metric-foot">Progress history saved</div></article></div>
       <div class="dashboard-grid"><section class="panel panel-large"><div class="panel-heading"><div><h2>Coaching follow-up</h2><p>Coaching that is not yet complete</p></div><button class="text-link" data-go="coaching">View all →</button></div><div id="dashboardCoaching" class="list-area"></div></section><section class="panel"><div class="panel-heading"><div><h2>Quick actions</h2><p>Common tasks</p></div></div><div class="quick-actions"><button class="quick-action" data-action="upload-file"><span class="qa-icon qa-green">▣</span><span><strong>Upload QA PDF</strong><small>Review extracted details before saving</small></span><b>→</b></button><button class="quick-action" data-action="add-coaching"><span class="qa-icon qa-amber">◷</span><span><strong>Record Coaching</strong><small>Save feedback and the trainee’s SMART plan</small></span><b>→</b></button></div></section></div>
       <section class="panel recent-panel"><div class="panel-heading"><div><h2>Recent QA audits</h2><p>Most recent QA results</p></div><button class="text-link" data-go="audits">View QA audits →</button></div><div id="dashboardAudits" class="table-wrap"></div></section>
