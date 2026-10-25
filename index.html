@@ -666,12 +666,16 @@ async function handleAuthSubmit(e){
  e.preventDefault();if(authSubmissionInProgress)return;authSubmissionInProgress=true;const mode=$('#authForm').dataset.mode;$('#authMessage').classList.add('hidden');$('#authSubmit').disabled=true;
  try{
   if(mode==='setup'){
-   const displayName=$('#setupDisplayName').value.trim(),username=$('#setupUsername').value.trim().toLowerCase(),password=$('#setupPassword').value,confirmPassword=$('#setupConfirmPassword').value,setupCode=$('#setupCode').value.trim();
+   const displayNameInput=$('#setupDisplayName'),setupUsernameInput=$('#setupUsername'),setupPasswordInput=$('#setupPassword'),confirmPasswordInput=$('#setupConfirmPassword'),setupCodeInput=$('#setupCode');
+   if(!displayNameInput||!setupUsernameInput||!setupPasswordInput||!confirmPasswordInput||!setupCodeInput)throw new Error('The account setup form did not finish loading. Reload the page and try again.');
+   const displayName=displayNameInput.value.trim(),username=setupUsernameInput.value.trim().toLowerCase(),password=setupPasswordInput.value,confirmPassword=confirmPasswordInput.value,setupCode=setupCodeInput.value.trim();
    if(!displayName)throw new Error('Enter your name.');if(!/^[a-z0-9._-]{3,32}$/.test(username))throw new Error('Use a valid username with 3–32 letters, numbers, dots, underscores, or hyphens.');if(password.length<10)throw new Error('Use a password with at least 10 characters.');if(password!==confirmPassword)throw new Error('The passwords do not match.');if(setupCode.length<20)throw new Error('Enter the one-time setup code.');
    const salt=makeSalt(),passwordHash=await hashPassword(password,salt),legacyAdmins=legacyAuthUsers.filter(u=>u.role==='admin'&&u.active!==false&&u.username&&u.salt&&u.passwordHash).map(u=>({username:String(u.username).toLowerCase(),displayName:String(u.displayName||u.username),salt:u.salt,passwordHash:u.passwordHash}));
    const result=await cloudRequest('setup',{displayName,username,salt,passwordHash,setupCode,legacyAdmins},{auth:false});cloudToken=result.token;localStorage.setItem(CLOUD_TOKEN_KEY,cloudToken);localStorage.removeItem(AUTH_KEY);await enterApp(result.user);toast('Shared workspace connected','Your Superuser account is ready. Data is being synchronized from this device.');return;
   }
-  const username=$('#authUsername').value.trim().toLowerCase(),password=$('#authPassword').value;if(!username||!password)throw new Error('Enter your username and password.');
+  const usernameInput=$('#authUsername'),passwordInput=$('#authPassword');
+  if(!usernameInput||!passwordInput)throw new Error('The sign-in fields did not finish loading. Reload the page and try again.');
+  const username=usernameInput.value.trim().toLowerCase(),password=passwordInput.value;if(!username||!password)throw new Error('Enter your username and password.');
   const challenge=await cloudRequest('login-challenge',{username},{auth:false});if(!challenge.salt)throw new Error('Username or password is incorrect, or the account is disabled.');
   deviceBindingExempt=String(challenge.role||'').toLowerCase()==='superuser';
   const passwordHash=await hashPassword(password,challenge.salt),result=await cloudRequest('login',{username,passwordHash},{auth:false});cloudToken=result.token;localStorage.setItem(CLOUD_TOKEN_KEY,cloudToken);await enterApp(result.user);
