@@ -306,6 +306,44 @@ body[data-theme="cyberpunk"] .workflow-step:hover{border-color:#bd7aff}
 .dashboard-grid .panel-large{min-height:0}
 .dashboard-grid .list-area{padding-top:10px;padding-bottom:16px}
 @media(max-width:620px){.workflow-hub-heading{align-items:flex-start;flex-direction:column}.workflow-evidence-action{width:100%}}
+
+/* UX polish: clear keyboard focus, consistent interaction feedback, and compact small-screen controls. */
+:where(button,a,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:3px solid var(--blue,#4f6bed);
+  outline-offset:3px;
+}
+:where(button,a){-webkit-tap-highlight-color:transparent}
+button:not(:disabled),a{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+button:disabled{cursor:not-allowed;opacity:.58}
+.nav-link[aria-current="page"],.nav-link.active{
+  background:var(--blue-soft,#eef2ff);
+  border-color:color-mix(in srgb,var(--blue,#4f6bed) 24%,transparent);
+  color:var(--blue,#4f6bed);
+  font-weight:750;
+}
+.metric-card,.panel,.workflow-hub{min-width:0}
+.metric-foot,.panel-heading p,.workflow-hub-heading p{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .metric-card{min-width:0}
+  .metric-value{font-variant-numeric:tabular-nums}
+  .filter-bar{gap:9px}
+  .filter-bar .search-box{min-width:0;width:100%}
+  .filter-bar input,.filter-bar select{max-width:100%;min-width:0}
+  .table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .panel-heading{gap:10px;align-items:flex-start}
+}
+@media(max-width:620px){
+  .topbar-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .topbar-actions .today-chip{display:none}
+  .topbar-actions .theme-control select{max-width:105px}
+  .topbar-actions .btn{min-height:36px;padding:7px 10px}
+  .page-heading h1{overflow-wrap:anywhere}
+  .workflow-step{touch-action:manipulation}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
 </style>
 </head>
 <body data-theme="light">
