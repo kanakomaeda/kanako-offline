@@ -298,6 +298,14 @@ body[data-theme="dark"] .workflow-step:hover{border-color:#6679f6}
 body[data-theme="cyberpunk"] .workflow-hub{background:linear-gradient(120deg,#120d20,#211232);border-color:#3b2055}
 body[data-theme="cyberpunk"] .workflow-step{background:#150e25;border-color:#3b2055;color:#fff5ff}
 body[data-theme="cyberpunk"] .workflow-step:hover{border-color:#bd7aff}
+
+/* Remove competing dashboard shortcuts; the workflow is the single primary action area. */
+.workflow-hub-heading{align-items:center}
+.workflow-evidence-action{white-space:nowrap;flex-shrink:0}
+.dashboard-grid{grid-template-columns:minmax(0,1fr)}
+.dashboard-grid .panel-large{min-height:0}
+.dashboard-grid .list-area{padding-top:10px;padding-bottom:16px}
+@media(max-width:620px){.workflow-hub-heading{align-items:flex-start;flex-direction:column}.workflow-evidence-action{width:100%}}
 </style>
 </head>
 <body data-theme="light">
@@ -352,16 +360,16 @@ body[data-theme="cyberpunk"] .workflow-step:hover{border-color:#bd7aff}
     <section class="page" id="dashboardView">
       <div class="page-heading dashboard-welcome"><div><div class="eyebrow">TRAINING WORKSPACE</div><h1>Your training overview</h1><p>Track performance, coach with evidence, and verify improvement from one place.</p></div></div>
       <section class="workflow-hub" aria-label="Training workflow">
-        <div class="workflow-hub-heading"><div><span class="eyebrow">RECOMMENDED WORKFLOW</span><h2>Move each trainee forward</h2><p>Follow the same sequence to keep audits, coaching, and outcomes connected.</p></div></div>
+        <div class="workflow-hub-heading"><div><span class="eyebrow">RECOMMENDED WORKFLOW</span><h2>Move each trainee forward</h2><p>Follow the same sequence to keep audits, coaching, and outcomes connected.</p></div><button type="button" class="btn btn-outline workflow-evidence-action" data-action="upload-file">＋ Upload QA evidence</button></div>
         <div class="workflow-steps">
-          <button type="button" class="workflow-step" data-action="add-audit"><span class="workflow-step-number">01</span><span class="workflow-step-copy"><strong>Record QA audit</strong><small>Capture score and evidence</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="workflow-step" data-action="add-audit"><span class="workflow-step-number">01</span><span class="workflow-step-copy"><strong>Record QA audit</strong><small>Review the score and findings</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="workflow-step" data-action="add-coaching"><span class="workflow-step-number">02</span><span class="workflow-step-copy"><strong>Coach the gap</strong><small>Agree on a SMART action</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="workflow-step" data-go="coaching"><span class="workflow-step-number">03</span><span class="workflow-step-copy"><strong>Follow up</strong><small>Review due sessions</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="workflow-step" data-go="audits"><span class="workflow-step-number">04</span><span class="workflow-step-copy"><strong>Verify improvement</strong><small>Compare baseline and follow-up</small></span><span class="workflow-step-arrow" aria-hidden="true">↗</span></button>
         </div>
       </section>
       <div class="metric-grid"><article class="metric-card"><div class="metric-top"><span>Active trainees</span><span class="metric-icon blue">♙</span></div><div class="metric-value" id="metricTrainees">0</div><div class="metric-foot" id="metricTraineesFoot">No trainee records yet</div></article><article class="metric-card"><div class="metric-top"><span>QA audits logged</span><span class="metric-icon purple">✓</span></div><div class="metric-value" id="metricAudits">0</div><div class="metric-foot">Across all trainee records</div></article><article class="metric-card"><div class="metric-top"><span>Coaching to complete</span><span class="metric-icon amber">◷</span></div><div class="metric-value" id="metricCoaching">0</div><div class="metric-foot" id="metricCoachingFoot">Generated from QA audits</div></article><article class="metric-card"><div class="metric-top"><span>Weekly reports</span><span class="metric-icon green">▤</span></div><div class="metric-value" id="metricReports">0</div><div class="metric-foot">Progress history saved</div></article></div>
-      <div class="dashboard-grid"><section class="panel panel-large"><div class="panel-heading"><div><h2>Coaching follow-up</h2><p>Coaching that is not yet complete</p></div><button class="text-link" data-go="coaching">View all →</button></div><div id="dashboardCoaching" class="list-area"></div></section><section class="panel"><div class="panel-heading"><div><h2>Quick actions</h2><p>Common tasks</p></div></div><div class="quick-actions"><button class="quick-action" data-action="upload-file"><span class="qa-icon qa-green">▣</span><span><strong>Upload QA PDF</strong><small>Review extracted details before saving</small></span><b>→</b></button><button class="quick-action" data-action="add-coaching"><span class="qa-icon qa-amber">◷</span><span><strong>Record Coaching</strong><small>Save feedback and the trainee’s SMART plan</small></span><b>→</b></button></div></section></div>
+      <div class="dashboard-grid"><section class="panel panel-large"><div class="panel-heading"><div><h2>Coaching follow-up</h2><p>Outstanding sessions, ordered by follow-up priority</p></div><button class="text-link" data-go="coaching">View all sessions →</button></div><div id="dashboardCoaching" class="list-area"></div></section></div>
       <section class="panel recent-panel"><div class="panel-heading"><div><h2>Recent QA audits</h2><p>Most recent QA results</p></div><button class="text-link" data-go="audits">View QA audits →</button></div><div id="dashboardAudits" class="table-wrap"></div></section>
     </section>
     <section class="page hidden" id="traineesView"><div class="page-heading"><div><div class="eyebrow">TRAINEES</div><h1>Onboarding Trainees</h1><p>Maintain each trainee’s details and monitor their training status.</p></div></div><div class="filter-bar"><div class="search-box"><span>⌕</span><input id="traineeSearch" placeholder="Search name, client, or role…"></div><select id="traineeStatusFilter" class="filter-select"><option value="">All statuses</option><option>Training</option><option>Shadowing</option><option>Back Up</option><option>Graduated</option><option>On Hold</option></select><span class="result-count" id="traineeCount"></span></div><section class="panel table-panel"><div id="traineesTable" class="table-wrap"></div></section></section>
