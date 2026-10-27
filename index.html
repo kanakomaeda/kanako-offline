@@ -648,7 +648,7 @@ async function hashPassword(password,salt){if(!window.crypto||!crypto.subtle)thr
 function showAuthMessage(message){$('#authMessage').textContent=message;$('#authMessage').classList.remove('hidden')}
 function clearUserMessage(){const el=$('#userMessage');el.textContent='';el.classList.add('hidden')}
 async function renderAuthScreen(message=''){
-  if(cloudToken){try{const session=await cloudRequest('me');await enterApp(session.user);return}catch(_){cloudToken='';localStorage.removeItem(CLOUD_TOKEN_KEY)}}
+  if(cloudToken){try{const session=await Promise.race([cloudRequest('me'),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Saved session check timed out.')),5000))]);await enterApp(session.user);return}catch(_){cloudToken='';localStorage.removeItem(CLOUD_TOKEN_KEY)}}
   $('#authEyebrow').textContent='SHARED WORKSPACE ACCESS';$('#authTitle').textContent='Connect to Kanako';$('#authDescription').textContent='Sign in to the shared Kanako workspace. Your approved account works across devices.';$('#authMessage').textContent='';$('#authMessage').classList.add('hidden');
   // Render usable login controls immediately; do not leave a button-only screen while checking cloud setup status.
   const loginFields='<div class="auth-field"><label for="authUsername">Username *</label><input id="authUsername" required autocomplete="username"></div><div class="auth-field"><label for="authPassword">Password *</label><input id="authPassword" type="password" required autocomplete="current-password"></div>';
