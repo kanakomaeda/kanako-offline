@@ -32,16 +32,16 @@ jobs:
           const fs = require('node:fs');
           const { spawnSync } = require('node:child_process');
           const html = fs.readFileSync('/tmp/kanako-app.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
           if (!scripts.length) throw new Error('No inline scripts were found in the HTML file.');
           let checked = 0;
           scripts.forEach((match, index) => {
             const attrs = match[1] || '';
-            if (/\\btype\\s*=\\s*["']?importmap["']?/i.test(attrs)) {
+            if (/\btype\s*=\s*["']?importmap["']?/i.test(attrs)) {
               console.log('Skipping JSON import map ' + (index + 1) + '.');
               return;
             }
-            const isModule = /\\btype\\s*=\\s*["']module["']/i.test(attrs);
+            const isModule = /\btype\s*=\s*["']module["']/i.test(attrs);
             const path = '/tmp/kanako-package-inline-' + index + (isModule ? '.mjs' : '.js');
             fs.writeFileSync(path, match[2]);
             const result = spawnSync(process.execPath, ['--check', path], { encoding: 'utf8' });
