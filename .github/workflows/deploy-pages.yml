@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "Kanako_Offline_Workbench.html"
+      - "index.html"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
-          const html = fs.readFileSync('Kanako_Offline_Workbench.html', 'utf8');
+          const html = fs.readFileSync('index.html', 'utf8');
           const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
           if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
           scripts.forEach((match, index) => {
@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site
-          cp Kanako_Offline_Workbench.html _site/index.html
+          cp index.html _site/index.html
           touch _site/.nojekyll
           cat > _site/README-ONLINE.txt <<'EOF'
           Kanako Progress Hub - online static version
