@@ -283,6 +283,16 @@ async function handler(req: Request) {
         if (error.code === "23505") return response(origin, { error: "That username is already in use." }, 409);
         throw error;
       }
+      const verified = await verifyDeviceSignature(req, await sha256(rawBody), user.id);
+      if (!verified.ok) {
+        await DB.from("workspace_app_users").delete().eq("id", user.id);
+        return response(origin, { error: verified.message }, 403);
+      }
+      const device = await authorizeDevice(user, String(body.deviceId || ""), String(body.deviceLabel || ""), verified.jwk);
+      if (!device.allowed) {
+        await DB.from("workspace_app_users").delete().eq("id", user.id);
+        return response(origin, { error: device.message }, 403);
+      }
       await DB.from("workspace_setup_config").delete().eq("id", true);
       const legacyAdmins = Array.isArray(body.legacyAdmins) ? body.legacyAdmins.slice(0, 100) : [];
       for (const admin of legacyAdmins) {
@@ -293,16 +303,6 @@ async function handler(req: Request) {
           display_name: String(admin?.displayName || legacyUsername).slice(0, 80),
           role: "admin", active: true, password_salt: admin.salt, password_hash: String(admin.passwordHash).toLowerCase()
         }, { onConflict: "username", ignoreDuplicates: true });
-      }
-      const verified = await verifyDeviceSignature(req, await sha256(rawBody), user.id);
-      if (!verified.ok) {
-        await DB.from("workspace_app_users").delete().eq("id", user.id);
-        return response(origin, { error: verified.message }, 403);
-      }
-      const device = await authorizeDevice(user, String(body.deviceId || ""), String(body.deviceLabel || ""), verified.jwk);
-      if (!device.allowed) {
-        await DB.from("workspace_app_users").delete().eq("id", user.id);
-        return response(origin, { error: device.message }, 403);
       }
       return response(origin, await issueSession(user, String(body.deviceId)), 201);
     }
