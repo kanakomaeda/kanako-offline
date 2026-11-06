@@ -30,13 +30,29 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
+          const { spawnSync } = require('node:child_process');
           const html = fs.readFileSync('/tmp/kanako-app.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
-          if (!scripts.length) throw new Error('No inline JavaScript was found in the HTML file.');
+          const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+          if (!scripts.length) throw new Error('No inline scripts were found in the HTML file.');
+          let checked = 0;
           scripts.forEach((match, index) => {
-            new Function(match[1]);
+            const attrs = match[1] || '';
+            if (/\\btype\\s*=\\s*["']?importmap["']?/i.test(attrs)) {
+              console.log('Skipping JSON import map ' + (index + 1) + '.');
+              return;
+            }
+            const isModule = /\\btype\\s*=\\s*["']module["']/i.test(attrs);
+            const path = '/tmp/kanako-package-inline-' + index + (isModule ? '.mjs' : '.js');
+            fs.writeFileSync(path, match[2]);
+            const result = spawnSync(process.execPath, ['--check', path], { encoding: 'utf8' });
+            if (result.status !== 0) {
+              process.stderr.write(result.stderr || result.stdout);
+              process.exit(result.status || 1);
+            }
+            checked++;
             console.log('JavaScript block ' + (index + 1) + ' parsed successfully.');
           });
+          if (!checked) throw new Error('No JavaScript blocks were available to validate.');
           NODE
       - name: Package offline app
         run: |
