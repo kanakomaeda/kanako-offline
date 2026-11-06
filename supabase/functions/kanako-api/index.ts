@@ -9,6 +9,7 @@ const RECORD_TYPES = new Set(["trainees","audits","coachings","weekly_reports","
 const ALLOWED_ORIGINS = new Set([
   "https://kanako-onboarding-progress-hub.vercel.app",
   "https://kanako-progress-hub.vercel.app",
+  "https://kanakomaeda.github.io",
   "https://kanako-progress-hub-vapepokemon143-8805.vercel.app",
   "https://kanako-progress-hub-git-feature-supe-b08eaf-vapepokemon143-8805.vercel.app",
   "http://localhost:8000", "http://127.0.0.1:8000"
@@ -98,8 +99,20 @@ function validHashSalt(body: any) {
     && typeof body?.salt === "string" && body.salt.length >= 16 && body.salt.length <= 128;
 }
 async function authorizeDevice(user: any, deviceId: string, deviceLabel: string, publicKeyJwk: any) {
-  // Superusers are exempt from registered-device approval and key binding.
-  if (String(user.role || "").toLowerCase() === "superuser") return { allowed: true };
+  if (!/^[a-f0-9-]{36}$/i.test(deviceId)) {
+    return { allowed: false, message: "This browser could not be identified. Refresh the page and try again." };
+  }
+  const label = String(deviceLabel || "Browser device").slice(0, 160);
+  if (String(user.role || "").toLowerCase() === "superuser") {
+    // The single Superuser cannot approve their own device-change request.
+    // Require password + signed login, then bind the new session to this browser key.
+    const { error } = await DB.from("workspace_user_devices").upsert({
+      user_id: user.id, device_id: deviceId, device_label: label,
+      public_key_jwk: publicKeyJwk, updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+    if (error) throw error;
+    return { allowed: true };
+  }
   if (!/^[a-f0-9-]{36}$/i.test(deviceId)) {
     return { allowed: false, message: "This browser could not be identified. Refresh the page and try again." };
   }
@@ -161,12 +174,10 @@ async function userForToken(token: string, deviceId: string) {
     await DB.from("workspace_sessions").delete().eq("id", session.id);
     return null;
   }
-  if (String(user.role || "").toLowerCase() !== "superuser") {
-    if (session.device_id !== deviceId) return null;
-    const { data: registered, error: deviceErr } = await DB.from("workspace_user_devices")
-      .select("device_id").eq("user_id", session.user_id).maybeSingle();
-    if (deviceErr || !registered || registered.device_id !== deviceId) return null;
-  }
+  if (session.device_id !== deviceId) return null;
+  const { data: registered, error: deviceErr } = await DB.from("workspace_user_devices")
+    .select("device_id").eq("user_id", session.user_id).maybeSingle();
+  if (deviceErr || !registered || registered.device_id !== deviceId) return null;
   return { user, session };
 }
 function bearer(req: Request) {
@@ -191,15 +202,31 @@ async function upsertRecords(rows: any[], userId: string) {
 async function deleteRecords(rows: any[]) {
   if (!Array.isArray(rows) || rows.length > 3000) throw new Error("Invalid delete batch.");
   for (const r of rows) {
-    if (!RECORD_TYPES.has(String(r.record_type)) || !String(r.record_key || "").trim()) throw new Error("Invalid record delete request.");
-    const { error } = await DB.from("workspace_records").delete().eq("record_type", String(r.record_type)).eq("record_key", String(r.record_key));
-    if (error) throw error;
-    const { data: frows } = await DB.from("workspace_files").select("storage_path").eq("record_key", String(r.record_key));
-    if (frows?.length) {
-      const paths = frows.map((x: any) => x.storage_path);
-      await DB.storage.from(BUCKET).remove(paths);
-      await DB.from("workspace_files").delete().eq("record_key", String(r.record_key));
+    const recordType = String(r.record_type);
+    const recordKey = String(r.record_key || "").trim();
+    if (!RECORD_TYPES.has(recordType) || !recordKey) throw new Error("Invalid record delete request.");
+
+    // Attachment metadata uses file-kind types (pdf/mp4/auditpdf), not parent record types.
+    // Resolve exact paths from the parent payload so prefixed legacy keys are handled safely.
+    const { data: existing, error: lookupError } = await DB.from("workspace_records")
+      .select("payload").eq("record_type", recordType).eq("record_key", recordKey).maybeSingle();
+    if (lookupError) throw lookupError;
+    const payload = existing?.payload && typeof existing.payload === "object" ? existing.payload : {};
+    const attachmentPaths = [...new Set(Object.entries(payload)
+      .filter(([key, value]) => /storage_path$/i.test(key) && typeof value === "string" && value.trim())
+      .map(([, value]) => String(value).trim()))];
+
+    if (attachmentPaths.length) {
+      const { error: storageError } = await DB.storage.from(BUCKET).remove(attachmentPaths);
+      if (storageError) throw storageError;
+      const { error: metadataError } = await DB.from("workspace_files")
+        .delete().in("storage_path", attachmentPaths);
+      if (metadataError) throw metadataError;
     }
+
+    const { error } = await DB.from("workspace_records").delete()
+      .eq("record_type", recordType).eq("record_key", recordKey);
+    if (error) throw error;
   }
 }
 function stableJson(value: any): string { if(value===null||typeof value!=="object")return JSON.stringify(value);if(Array.isArray(value))return "["+value.map(stableJson).join(",")+"]";return "{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stableJson(value[k])).join(",")+"}"; }
@@ -271,7 +298,16 @@ async function handler(req: Request) {
           role: "admin", active: true, password_salt: admin.salt, password_hash: String(admin.passwordHash).toLowerCase()
         }, { onConflict: "username", ignoreDuplicates: true });
       }
-      // Initial account setup creates the Superuser, which is exempt from device binding.
+      const verified = await verifyDeviceSignature(req, await sha256(rawBody), user.id);
+      if (!verified.ok) {
+        await DB.from("workspace_app_users").delete().eq("id", user.id);
+        return response(origin, { error: verified.message }, 403);
+      }
+      const device = await authorizeDevice(user, String(body.deviceId || ""), String(body.deviceLabel || ""), verified.jwk);
+      if (!device.allowed) {
+        await DB.from("workspace_app_users").delete().eq("id", user.id);
+        return response(origin, { error: device.message }, 403);
+      }
       return response(origin, await issueSession(user, String(body.deviceId)), 201);
     }
 
@@ -319,12 +355,10 @@ async function handler(req: Request) {
       }
       const { error: resetErr } = await DB.rpc("reset_kanako_signin_failures", { p_username: username });
       if (resetErr) throw resetErr;
-      if (String(user.role || "").toLowerCase() !== "superuser") {
-        const verified = await verifyDeviceSignature(req, await sha256(rawBody), user.id);
-        if (!verified.ok) return response(origin, { error: verified.message }, 403);
-        const device = await authorizeDevice(user, String(body.deviceId || ""), String(body.deviceLabel || ""), verified.jwk);
-        if (!device.allowed) return response(origin, { error: device.message }, 403);
-      }
+      const verified = await verifyDeviceSignature(req, await sha256(rawBody), user.id);
+      if (!verified.ok) return response(origin, { error: verified.message }, 403);
+      const device = await authorizeDevice(user, String(body.deviceId || ""), String(body.deviceLabel || ""), verified.jwk);
+      if (!device.allowed) return response(origin, { error: device.message }, 403);
       return response(origin, await issueSession(user, String(body.deviceId)));
     }
 
@@ -358,20 +392,18 @@ async function handler(req: Request) {
     const resolved = await userForToken(token, String(body.deviceId || ""));
     if (!resolved) return response(origin, { error: "Your session expired. Please sign in again." }, 401);
     const user = resolved.user;
-    if (String(user.role || "").toLowerCase() !== "superuser") {
-      let bodyHash = await sha256(rawBody);
-      if (ctype.includes("multipart/form-data")) {
-        const multipartHash = await multipartSignatureHash(body, uploadFile);
-        if (!multipartHash) return response(origin, { error: "Uploaded file digest verification failed." }, 403);
-        bodyHash = multipartHash;
-      }
-      const { data: registeredDevice, error: registeredError } = await DB.from("workspace_user_devices")
-        .select("public_key_jwk").eq("user_id", user.id).maybeSingle();
-      if (registeredError) throw registeredError;
-      if (!registeredDevice?.public_key_jwk) return response(origin, { error: "This account needs Superuser approval to register its cryptographic device key." }, 403);
-      const verified = await verifyDeviceSignature(req, bodyHash, user.id, registeredDevice.public_key_jwk);
-      if (!verified.ok) return response(origin, { error: verified.message }, 403);
+    let bodyHash = await sha256(rawBody);
+    if (ctype.includes("multipart/form-data")) {
+      const multipartHash = await multipartSignatureHash(body, uploadFile);
+      if (!multipartHash) return response(origin, { error: "Uploaded file digest verification failed." }, 403);
+      bodyHash = multipartHash;
     }
+    const { data: registeredDevice, error: registeredError } = await DB.from("workspace_user_devices")
+      .select("public_key_jwk").eq("user_id", user.id).maybeSingle();
+    if (registeredError) throw registeredError;
+    if (!registeredDevice?.public_key_jwk) return response(origin, { error: "This account needs device registration. Please sign in again on this browser." }, 403);
+    const verified = await verifyDeviceSignature(req, bodyHash, user.id, registeredDevice.public_key_jwk);
+    if (!verified.ok) return response(origin, { error: verified.message }, 403);
 
     if (action === "ai-coaching-feedback") {
       const apiKey = Deno.env.get("OPENROUTER_API_KEY") || "";
