@@ -113,10 +113,6 @@ async function authorizeDevice(user: any, deviceId: string, deviceLabel: string,
     if (error) throw error;
     return { allowed: true };
   }
-  if (!/^[a-f0-9-]{36}$/i.test(deviceId)) {
-    return { allowed: false, message: "This browser could not be identified. Refresh the page and try again." };
-  }
-  const label = String(deviceLabel || "Browser device").slice(0, 160);
   let { data: registered, error } = await DB.from("workspace_user_devices")
     .select("device_id,device_label,public_key_jwk").eq("user_id", user.id).maybeSingle();
   if (error) throw error;
